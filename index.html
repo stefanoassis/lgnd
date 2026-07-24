@@ -152,6 +152,19 @@
   .empty-state{text-align:center;padding:50px 20px;color:var(--text-muted);}
   .empty-state .big{font-family:var(--font-display);font-size:20px;color:var(--text);margin-bottom:6px;}
 
+  .loading-overlay{
+    position:fixed;inset:0;background:rgba(18,22,26,0.86);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+    z-index:200;text-align:center;padding:20px;
+  }
+  .loading-overlay.hidden{display:none;}
+  .spinner{
+    width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-overlay .msg{font-family:var(--font-mono);font-size:13px;color:var(--text-muted);max-width:340px;}
+
   .checkbox-row{display:flex;align-items:center;gap:8px;}
   .checkbox-row input{width:auto;}
 
@@ -276,6 +289,10 @@
 </main>
 
 <div id="toastHost"></div>
+<div id="loadingOverlay" class="loading-overlay hidden">
+  <div class="spinner"></div>
+  <div class="msg" id="loadingMsg">Processando…</div>
+</div>
 
 <script>
 /* ======================= CONFIGURAÇÃO ======================= */
@@ -355,6 +372,13 @@ function statusBadgeClass(status){
     default: return 'info';
   }
 }
+function showLoading(msg){
+  document.getElementById('loadingMsg').textContent = msg || 'Processando…';
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading(){
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
 function showToast(msg, isError){
   const el = document.createElement('div');
   el.className = 'toast' + (isError ? ' error' : '');
@@ -368,7 +392,8 @@ function ativos(){
 
 /* ======================= API ======================= */
 async function apiGet(){
-  const res = await fetch(CONFIG.APPS_SCRIPT_URL);
+  const url = CONFIG.APPS_SCRIPT_URL + (CONFIG.APPS_SCRIPT_URL.includes('?') ? '&' : '?') + 'ts=' + Date.now();
+  const res = await fetch(url, { cache: 'no-store' });
   if(!res.ok) throw new Error('Falha ao carregar dados (' + res.status + ')');
   return res.json();
 }
@@ -383,6 +408,7 @@ async function apiPost(payload){
 }
 
 async function loadData(){
+  showLoading('Carregando dados da planilha…');
   setConn('connecting');
   try{
     const data = await apiGet();
@@ -396,6 +422,8 @@ async function loadData(){
   }catch(err){
     setConn('bad');
     showToast('Erro ao carregar dados: ' + err.message, true);
+  }finally{
+    hideLoading();
   }
 }
 function setConn(state_){
@@ -740,6 +768,7 @@ function cancelUpload(){
 }
 async function confirmUpload(){
   if(!state.pendingUpload) return;
+  showLoading('Importando participantes… isso pode levar alguns minutos. Não feche esta aba.');
   try{
     const res = await apiPost({ action: 'sync', records: state.pendingUpload });
     if(!res.ok) throw new Error(res.error || 'Erro ao sincronizar');
@@ -749,6 +778,8 @@ async function confirmUpload(){
     await loadData();
   }catch(err){
     showToast('Erro ao importar: ' + err.message, true);
+  }finally{
+    hideLoading();
   }
 }
 
