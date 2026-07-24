@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legendários · Triagem Médica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #12161A;
+    --surface: #1B2129;
+    --surface-2: #222A33;
+    --border: #2C3540;
+    --text: #EDEBE6;
+    --text-muted: #8FA0AC;
+    --accent: #D98E3F;
+    --accent-dim: #6B5330;
+    --ok: #4FA876;
+    --ok-bg: rgba(79,168,118,0.14);
+    --alert: #E1584F;
+    --alert-bg: rgba(225,88,79,0.14);
+    --warn: #E8B23D;
+    --warn-bg: rgba(232,178,61,0.14);
+    --info: #6E93A8;
+    --radius: 10px;
+    --font-display: 'Oswald', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  ::selection{background:var(--accent-dim);color:#fff;}
+
+  /* Header with contour-line motif */
+  header{
+    position:relative;padding:28px 32px 22px;border-bottom:1px solid var(--border);
+    overflow:hidden;background:linear-gradient(180deg,#161C22,var(--bg));
+  }
+  header svg.contours{position:absolute;inset:0;width:100%;height:100%;opacity:0.16;pointer-events:none;}
+  .header-inner{position:relative;display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .brand-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.18em;color:var(--accent);text-transform:uppercase;}
+  h1{font-family:var(--font-display);font-weight:600;font-size:28px;letter-spacing:0.01em;margin:4px 0 0;text-transform:uppercase;}
+  .header-meta{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);text-align:right;}
+  #connStatus{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--text-muted);}
+  .dot.ok{background:var(--ok);}
+  .dot.bad{background:var(--alert);}
+
+  nav{display:flex;gap:2px;padding:0 32px;border-bottom:1px solid var(--border);background:var(--bg);overflow-x:auto;}
+  nav button{
+    font-family:var(--font-body);font-weight:600;font-size:13px;color:var(--text-muted);
+    background:none;border:none;padding:14px 16px;cursor:pointer;border-bottom:2px solid transparent;
+    white-space:nowrap;transition:color .15s, border-color .15s;
+  }
+  nav button:hover{color:var(--text);}
+  nav button.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  main{padding:28px 32px 60px;max-width:1320px;margin:0 auto;}
+  .tab{display:none;}
+  .tab.active{display:block;animation:fadein .2s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:24px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+  .kpi .n{font-family:var(--font-display);font-size:32px;line-height:1;}
+  .kpi .l{font-size:12px;color:var(--text-muted);margin-top:6px;text-transform:uppercase;letter-spacing:0.04em;}
+  .kpi.accent .n{color:var(--accent);}
+  .kpi.ok .n{color:var(--ok);}
+  .kpi.alert .n{color:var(--alert);}
+  .kpi.warn .n{color:var(--warn);}
+
+  .charts-row{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:8px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+  .card h3{font-family:var(--font-display);font-size:15px;text-transform:uppercase;letter-spacing:0.03em;margin:0 0 14px;color:var(--text-muted);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;font-family:var(--font-mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;padding:8px 10px;border-bottom:1px solid var(--border);}
+  tbody td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tbody tr:hover{background:var(--surface-2);}
+  .mono{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);}
+
+  .badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;}
+  .badge.ok{background:var(--ok-bg);color:var(--ok);}
+  .badge.alert{background:var(--alert-bg);color:var(--alert);}
+  .badge.warn{background:var(--warn-bg);color:var(--warn);}
+  .badge.info{background:rgba(110,147,168,0.14);color:var(--info);}
+  .badge.muted{background:var(--surface-2);color:var(--text-muted);}
+
+  .flag-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;}
+  .flag-dot.ok{background:var(--ok);}
+  .flag-dot.alert{background:var(--alert);}
+
+  .wa-link{display:inline-flex;align-items:center;gap:6px;color:#25D366;text-decoration:none;font-weight:600;font-size:12px;}
+  .wa-link:hover{text-decoration:underline;}
+
+  input[type=text], input[type=search], select, textarea{
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    padding:9px 12px;border-radius:8px;font-family:var(--font-body);font-size:13px;width:100%;
+  }
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  label{font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.03em;}
+  .field{margin-bottom:16px;}
+  button.primary{
+    background:var(--accent);color:#1B1207;border:none;padding:10px 18px;border-radius:8px;
+    font-weight:700;font-size:13px;cursor:pointer;font-family:var(--font-body);
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.primary:disabled{opacity:0.5;cursor:not-allowed;}
+  button.ghost{background:none;border:1px solid var(--border);color:var(--text);padding:9px 16px;border-radius:8px;cursor:pointer;font-size:13px;}
+  button.ghost:hover{border-color:var(--accent);color:var(--accent);}
+
+  .search-row{display:flex;gap:10px;margin-bottom:18px;}
+  .search-row input{max-width:340px;}
+
+  .ficha-layout{display:grid;grid-template-columns:340px 1fr;gap:18px;}
+  .ficha-list{max-height:640px;overflow-y:auto;}
+  .ficha-list-item{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .ficha-list-item:hover{background:var(--surface-2);}
+  .ficha-list-item.selected{background:var(--surface-2);border-left:3px solid var(--accent);}
+  .ficha-list-item .name{font-weight:600;font-size:13px;}
+  .ficha-list-item .sub{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;}
+  .detail-row{padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;gap:12px;}
+  .detail-row .k{color:var(--text-muted);}
+  .detail-row .v{text-align:right;}
+
+  .upload-zone{
+    border:2px dashed var(--border);border-radius:var(--radius);padding:48px 24px;text-align:center;
+    cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  .upload-zone:hover, .upload-zone.dragover{border-color:var(--accent);background:rgba(217,142,63,0.05);}
+  .upload-zone .icon{font-size:34px;margin-bottom:10px;}
+  .upload-zone .hint{font-size:12px;color:var(--text-muted);margin-top:6px;}
+
+  .diff-summary{display:flex;gap:14px;margin:20px 0;flex-wrap:wrap;}
+  .diff-pill{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;}
+  .diff-pill.novos{background:var(--ok-bg);color:var(--ok);}
+  .diff-pill.atualizados{background:rgba(110,147,168,0.14);color:var(--info);}
+  .diff-pill.removidos{background:var(--warn-bg);color:var(--warn);}
+
+  .toast{
+    position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--ok);padding:12px 18px;border-radius:8px;font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:100;
+  }
+  .toast.error{border-left-color:var(--alert);}
+
+  .empty-state{text-align:center;padding:50px 20px;color:var(--text-muted);}
+  .empty-state .big{font-family:var(--font-display);font-size:20px;color:var(--text);margin-bottom:6px;}
+
+  .checkbox-row{display:flex;align-items:center;gap:8px;}
+  .checkbox-row input{width:auto;}
+
+  @media (max-width: 860px){
+    .charts-row{grid-template-columns:1fr;}
+    .ficha-layout{grid-template-columns:1fr;}
+    .detail-grid{grid-template-columns:1fr;}
+    main{padding:20px 16px 60px;}
+    header{padding:20px 16px;}
+    nav{padding:0 16px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="contours" viewBox="0 0 1000 140" preserveAspectRatio="none">
+    <path d="M0,110 Q100,60 220,90 T460,80 T700,100 T1000,70" stroke="#D98E3F" stroke-width="1" fill="none"/>
+    <path d="M0,90 Q120,40 240,70 T480,55 T720,80 T1000,45" stroke="#D98E3F" stroke-width="1" fill="none"/>
+    <path d="M0,130 Q140,90 260,110 T500,105 T740,120 T1000,95" stroke="#D98E3F" stroke-width="1" fill="none"/>
+  </svg>
+  <div class="header-inner">
+    <div>
+      <div class="brand-eyebrow">Legendários · Track La Comunidad</div>
+      <h1>Painel de Triagem Médica</h1>
+    </div>
+    <div class="header-meta">
+      <div id="connStatus"><span class="dot"></span> <span id="connLabel">conectando…</span></div>
+      <div id="lastSync" style="margin-top:4px;"></div>
+    </div>
+  </div>
+</header>
+
+<nav id="tabNav">
+  <button data-tab="visao" class="active">Visão Geral</button>
+  <button data-tab="pendencias">Pendências</button>
+  <button data-tab="alertas">Alertas de Saúde</button>
+  <button data-tab="contato">Contato</button>
+  <button data-tab="ficha">Ficha Individual</button>
+  <button data-tab="importar">Importar Dados</button>
+</nav>
+
+<main>
+
+  <!-- VISÃO GERAL -->
+  <section id="tab-visao" class="tab active">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="charts-row">
+      <div class="card"><h3>Distribuição por status</h3><canvas id="chartStatus" height="220"></canvas></div>
+      <div class="card"><h3>Score de saúde (faixas)</h3><canvas id="chartScore" height="220"></canvas></div>
+    </div>
+  </section>
+
+  <!-- PENDÊNCIAS -->
+  <section id="tab-pendencias" class="tab">
+    <div class="card">
+      <h3>Participantes com pendências</h3>
+      <table>
+        <thead><tr>
+          <th>Nome</th><th>CPF</th><th>Documentos</th><th>Exame</th><th>Atestado</th><th>Avaliação</th><th></th>
+        </tr></thead>
+        <tbody id="pendenciasBody"></tbody>
+      </table>
+      <div id="pendenciasEmpty" class="empty-state" style="display:none;">
+        <div class="big">Nenhuma pendência 🎉</div>
+        Todos os participantes ativos têm documentos, exame, atestado e avaliação em dia.
+      </div>
+    </div>
+  </section>
+
+  <!-- ALERTAS DE SAÚDE -->
+  <section id="tab-alertas" class="tab">
+    <div class="card">
+      <h3>Participantes que precisam de atenção médica</h3>
+      <table>
+        <thead><tr>
+          <th>Nome</th><th>Score</th><th>Condição médica</th><th>Medicamento</th><th>Restrição alimentar</th><th>Fuma/bebe/drogas</th><th></th>
+        </tr></thead>
+        <tbody id="alertasBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CONTATO -->
+  <section id="tab-contato" class="tab">
+    <div class="card">
+      <h3>Status de contato</h3>
+      <table>
+        <thead><tr><th>Nome</th><th>Telefone</th><th>Status de contato</th><th></th></tr></thead>
+        <tbody id="contatoBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FICHA INDIVIDUAL -->
+  <section id="tab-ficha" class="tab">
+    <div class="search-row">
+      <input type="search" id="fichaSearch" placeholder="Buscar por nome ou CPF…">
+    </div>
+    <div class="ficha-layout">
+      <div class="card ficha-list" id="fichaList"></div>
+      <div class="card" id="fichaDetail">
+        <div class="empty-state"><div class="big">Selecione um participante</div>Clique num nome à esquerda para ver e editar a ficha.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IMPORTAR DADOS -->
+  <section id="tab-importar" class="tab">
+    <div class="card">
+      <h3>Importar planilha da plataforma de inscrições (.xlsx)</h3>
+      <div class="upload-zone" id="uploadZone">
+        <div class="icon">⛰️</div>
+        <div><strong>Clique para selecionar</strong> ou arraste o arquivo aqui</div>
+        <div class="hint">Exporte o relatório de participantes da plataforma e cole aqui sem editar. CPF é usado como identificador — decisões já tomadas pela equipe médica não são perdidas.</div>
+        <input type="file" id="fileInput" accept=".xlsx" style="display:none;">
+      </div>
+      <div id="uploadPreview"></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toastHost"></div>
+
+<script>
+/* ======================= CONFIGURAÇÃO ======================= */
+const CONFIG = {
+  // Cole aqui a URL do seu Apps Script Web App (veja SETUP.md)
+  APPS_SCRIPT_URL: 'COLE_AQUI_A_URL_DO_SEU_APPS_SCRIPT'
+};
+
+/* ======================= ESTADO ======================= */
+const state = {
+  participantes: [],   // lista bruta vinda do backend (Inscricoes + gestao aninhada)
+  pendingUpload: null,  // registros normalizados aguardando confirmação de sync
+  selectedCpf: null
+};
+
+/* ======================= UTILITÁRIOS ======================= */
+function normalizeCPF(raw){
+  if(raw === null || raw === undefined) return '';
+  let digits = String(raw).replace(/\D/g,'');
+  while(digits.length < 11) digits = '0' + digits;
+  return digits;
+}
+function formatCPF(cpf){
+  if(!cpf || cpf.length !== 11) return cpf || '';
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+function normalizePhone(raw){
+  if(!raw) return null;
+  let digits = String(raw).replace(/\D/g,'');
+  if(digits.length > 11 && digits.startsWith('55')) digits = digits.slice(-11);
+  if(digits.length > 11) digits = digits.slice(-11);
+  return digits.length >= 10 ? digits : null;
+}
+function resolvePhone(t1,t2,t3){
+  const nums = [normalizePhone(t1), normalizePhone(t2), normalizePhone(t3)].filter(Boolean);
+  const counts = {};
+  nums.forEach(n => counts[n] = (counts[n]||0) + 1);
+  let best = null, bestCount = 0;
+  Object.entries(counts).forEach(([n,c]) => { if(c > bestCount){ best = n; bestCount = c; } });
+  if(bestCount >= 2) return { numero: best, status: 'Verificado' };
+  return { numero: nums[0] || '', status: nums.length ? 'Não confirmado' : 'Sem número' };
+}
+function pickAnswer(oldVal, newVal){
+  const vals = [oldVal, newVal].map(v => (v === undefined || v === null) ? '' : String(v).trim()).filter(v => v !== '');
+  if(vals.length === 0) return 'Não';
+  const comSim = vals.find(v => /sim/i.test(v));
+  return comSim || vals[0];
+}
+function isRespostaNegativa(v){
+  const s = String(v || '').trim().toLowerCase();
+  return s === '' || s === 'não' || s === 'nao' || s.startsWith('não') || s.startsWith('nao');
+}
+function computeFlags(p){
+  return [
+    { label: 'Condição médica', value: p.Condicao_Medica, ok: isRespostaNegativa(p.Condicao_Medica) },
+    { label: 'Medicamento', value: p.Medicamento, ok: isRespostaNegativa(p.Medicamento) },
+    { label: 'Restrição alimentar', value: p.Restricao_Alimentar, ok: isRespostaNegativa(p.Restricao_Alimentar) },
+    { label: 'Fuma/bebe/drogas', value: p.Fuma_Bebe_Drogas, ok: isRespostaNegativa(p.Fuma_Bebe_Drogas) }
+  ];
+}
+function computeScore(p){
+  const flags = computeFlags(p);
+  const okCount = flags.filter(f => f.ok).length;
+  return Math.round((okCount / flags.length) * 100);
+}
+function waLink(numero){
+  if(!numero) return null;
+  const withCountry = numero.length === 10 || numero.length === 11 ? '55' + numero : numero;
+  return 'https://api.whatsapp.com/send/?phone=' + withCountry;
+}
+function statusBadgeClass(status){
+  switch(status){
+    case 'Aprovado': return 'ok';
+    case 'Reprovado': return 'alert';
+    case 'Atenção': return 'warn';
+    case 'Desistência': return 'muted';
+    default: return 'info';
+  }
+}
+function showToast(msg, isError){
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  document.getElementById('toastHost').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+function ativos(){
+  return state.participantes.filter(p => p.Ativo_Na_Lista !== 'Não');
+}
+
+/* ======================= API ======================= */
+async function apiGet(){
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL);
+  if(!res.ok) throw new Error('Falha ao carregar dados (' + res.status + ')');
+  return res.json();
+}
+async function apiPost(payload){
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error('Falha na requisição (' + res.status + ')');
+  return res.json();
+}
+
+async function loadData(){
+  setConn('connecting');
+  try{
+    const data = await apiGet();
+    if(!data.ok) throw new Error(data.error || 'Erro desconhecido');
+    state.participantes = data.participantes.map(p => Object.assign({}, p, {
+      gestao: p.gestao || {}
+    }));
+    setConn('ok');
+    document.getElementById('lastSync').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+    renderAll();
+  }catch(err){
+    setConn('bad');
+    showToast('Erro ao carregar dados: ' + err.message, true);
+  }
+}
+function setConn(state_){
+  const dot = document.querySelector('#connStatus .dot');
+  const label = document.getElementById('connLabel');
+  dot.className = 'dot' + (state_ === 'ok' ? ' ok' : state_ === 'bad' ? ' bad' : '');
+  label.textContent = state_ === 'ok' ? 'conectado' : state_ === 'bad' ? 'sem conexão' : 'conectando…';
+}
+
+async function saveGestao(cpf, updates){
+  try{
+    const res = await apiPost({ action: 'updateGestao', cpf, updates });
+    if(!res.ok) throw new Error(res.error || 'Erro ao salvar');
+    const p = state.participantes.find(x => x.CPF === cpf);
+    if(p) Object.assign(p.gestao, updates);
+    showToast('Alterações salvas.');
+    renderAll();
+  }catch(err){
+    showToast('Erro ao salvar: ' + err.message, true);
+  }
+}
+
+/* ======================= NAVEGAÇÃO ======================= */
+document.getElementById('tabNav').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  document.querySelectorAll('#tabNav button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+});
+
+/* ======================= RENDER: VISÃO GERAL ======================= */
+let chartStatusInst, chartScoreInst;
+function renderVisaoGeral(){
+  const list = ativos();
+  const counts = { 'Aprovado':0, 'Reprovado':0, 'Atenção':0, 'Sem avaliação':0, 'Desistência':0 };
+  list.forEach(p => {
+    const s = p.gestao.Status_Avaliacao || 'Sem avaliação';
+    counts[s] = (counts[s] || 0) + 1;
+  });
+
+  const kpis = [
+    { l: 'Total ativos', n: list.length, cls: 'accent' },
+    { l: 'Aprovados', n: counts['Aprovado'] || 0, cls: 'ok' },
+    { l: 'Atenção', n: counts['Atenção'] || 0, cls: 'warn' },
+    { l: 'Reprovados', n: counts['Reprovado'] || 0, cls: 'alert' },
+    { l: 'Sem avaliação', n: counts['Sem avaliação'] || 0, cls: '' },
+    { l: 'Desistências', n: counts['Desistência'] || 0, cls: '' }
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    '<div class="kpi ' + k.cls + '"><div class="n">' + k.n + '</div><div class="l">' + k.l + '</div></div>'
+  ).join('');
+
+  const statusLabels = Object.keys(counts);
+  const statusData = statusLabels.map(l => counts[l]);
+  const statusColors = ['#4FA876','#E1584F','#E8B23D','#6E93A8','#8FA0AC'];
+  if(chartStatusInst) chartStatusInst.destroy();
+  chartStatusInst = new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: { labels: statusLabels, datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 0 }] },
+    options: { plugins: { legend: { position: 'bottom', labels: { color: '#8FA0AC', font: { size: 11 } } } } }
+  });
+
+  const buckets = { '0-25%':0, '26-50%':0, '51-75%':0, '76-100%':0 };
+  list.forEach(p => {
+    const s = computeScore(p);
+    if(s <= 25) buckets['0-25%']++;
+    else if(s <= 50) buckets['26-50%']++;
+    else if(s <= 75) buckets['51-75%']++;
+    else buckets['76-100%']++;
+  });
+  if(chartScoreInst) chartScoreInst.destroy();
+  chartScoreInst = new Chart(document.getElementById('chartScore'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(buckets),
+      datasets: [{ data: Object.values(buckets), backgroundColor: '#D98E3F', borderRadius: 4 }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8FA0AC' }, grid: { display: false } },
+        y: { ticks: { color: '#8FA0AC' }, grid: { color: '#2C3540' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+/* ======================= RENDER: PENDÊNCIAS ======================= */
+function renderPendencias(){
+  const pend = ativos().filter(p =>
+    p.Documentos_Enviados !== 'Sim' ||
+    p.gestao.Exame_Conferido !== 'Sim' ||
+    p.gestao.Atestado_Conferido !== 'Sim' ||
+    (p.gestao.Status_Avaliacao || 'Sem avaliação') === 'Sem avaliação'
+  );
+  const body = document.getElementById('pendenciasBody');
+  document.getElementById('pendenciasEmpty').style.display = pend.length ? 'none' : 'block';
+  body.innerHTML = pend.map(p => `
+    <tr>
+      <td>${p.Nome}</td>
+      <td class="mono">${formatCPF(p.CPF)}</td>
+      <td>${badge(p.Documentos_Enviados === 'Sim', 'Enviados', 'Pendente')}</td>
+      <td>${badge(p.gestao.Exame_Conferido === 'Sim', 'OK', 'Pendente')}</td>
+      <td>${badge(p.gestao.Atestado_Conferido === 'Sim', 'OK', 'Pendente')}</td>
+      <td><span class="badge ${statusBadgeClass(p.gestao.Status_Avaliacao)}">${p.gestao.Status_Avaliacao || 'Sem avaliação'}</span></td>
+      <td><button class="ghost" onclick="openFicha('${p.CPF}')">Abrir ficha</button></td>
+    </tr>
+  `).join('');
+}
+function badge(isOk, okLabel, notOkLabel){
+  return isOk ? `<span class="badge ok">${okLabel}</span>` : `<span class="badge warn">${notOkLabel}</span>`;
+}
+
+/* ======================= RENDER: ALERTAS DE SAÚDE ======================= */
+function renderAlertas(){
+  const list = ativos()
+    .map(p => Object.assign({ score: computeScore(p) }, p))
+    .filter(p => p.score < 100)
+    .sort((a,b) => a.score - b.score);
+
+  document.getElementById('alertasBody').innerHTML = list.map(p => {
+    const flags = computeFlags(p);
+    const cellFor = (label) => {
+      const f = flags.find(x => x.label === label);
+      const dot = `<span class="flag-dot ${f.ok ? 'ok' : 'alert'}"></span>`;
+      return dot + (f.ok ? '—' : f.value);
+    };
+    return `<tr>
+      <td>${p.Nome}</td>
+      <td><strong style="color:${p.score < 50 ? 'var(--alert)' : 'var(--warn)'}">${p.score}%</strong></td>
+      <td>${cellFor('Condição médica')}</td>
+      <td>${cellFor('Medicamento')}</td>
+      <td>${cellFor('Restrição alimentar')}</td>
+      <td>${cellFor('Fuma/bebe/drogas')}</td>
+      <td><button class="ghost" onclick="openFicha('${p.CPF}')">Abrir ficha</button></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ======================= RENDER: CONTATO ======================= */
+function renderContato(){
+  const list = ativos().slice().sort((a,b) => {
+    const order = ['Aguardando contato','Tentando / Em contato','Contato realizado','Sem necessidade de contato'];
+    return order.indexOf(a.gestao.Status_Contato) - order.indexOf(b.gestao.Status_Contato);
+  });
+  document.getElementById('contatoBody').innerHTML = list.map(p => {
+    const link = waLink(p.Telefone_Verificado);
+    const telHtml = p.Telefone_Status === 'Verificado'
+      ? `<span class="mono">${p.Telefone_Verificado}</span>`
+      : `<span class="badge warn">⚠️ não confirmado</span>`;
+    return `<tr>
+      <td>${p.Nome}</td>
+      <td>${telHtml}</td>
+      <td>
+        <select onchange="saveGestao('${p.CPF}', {Status_Contato: this.value})">
+          ${['Aguardando contato','Tentando / Em contato','Contato realizado','Sem necessidade de contato'].map(s =>
+            `<option value="${s}" ${p.gestao.Status_Contato === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>${link ? `<a class="wa-link" href="${link}" target="_blank">💬 WhatsApp</a>` : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ======================= RENDER: FICHA INDIVIDUAL ======================= */
+function renderFichaList(filter){
+  const term = (filter || '').toLowerCase();
+  const list = ativos().filter(p =>
+    !term || p.Nome.toLowerCase().includes(term) || p.CPF.includes(term.replace(/\D/g,''))
+  );
+  document.getElementById('fichaList').innerHTML = list.map(p => `
+    <div class="ficha-list-item ${state.selectedCpf === p.CPF ? 'selected' : ''}" onclick="openFicha('${p.CPF}')">
+      <div class="name">${p.Nome}</div>
+      <div class="sub">${formatCPF(p.CPF)} · <span class="badge ${statusBadgeClass(p.gestao.Status_Avaliacao)}">${p.gestao.Status_Avaliacao || 'Sem avaliação'}</span></div>
+    </div>
+  `).join('') || '<div class="empty-state">Nenhum participante encontrado.</div>';
+}
+function openFicha(cpf){
+  state.selectedCpf = cpf;
+  document.querySelector('#tabNav button[data-tab="ficha"]').click();
+  renderFichaList(document.getElementById('fichaSearch').value);
+  renderFichaDetail(cpf);
+}
+function renderFichaDetail(cpf){
+  const p = state.participantes.find(x => x.CPF === cpf);
+  const container = document.getElementById('fichaDetail');
+  if(!p){ container.innerHTML = '<div class="empty-state"><div class="big">Selecione um participante</div></div>'; return; }
+  const flags = computeFlags(p);
+  const link = waLink(p.Telefone_Verificado);
+
+  container.innerHTML = `
+    <h3>${p.Nome}</h3>
+    <div class="detail-grid">
+      <div class="detail-row"><span class="k">CPF</span><span class="v mono">${formatCPF(p.CPF)}</span></div>
+      <div class="detail-row"><span class="k">Idade</span><span class="v">${p.Idade || '—'}</span></div>
+      <div class="detail-row"><span class="k">Email</span><span class="v">${p.Email || '—'}</span></div>
+      <div class="detail-row"><span class="k">Cidade/Estado</span><span class="v">${p.Cidade || '—'} / ${p.Estado || '—'}</span></div>
+      <div class="detail-row"><span class="k">Telefone</span><span class="v">${p.Telefone_Verificado || '—'} ${p.Telefone_Status !== 'Verificado' ? '<span class="badge warn">⚠️ '+p.Telefone_Status+'</span>' : ''}</span></div>
+      <div class="detail-row"><span class="k">Camisa</span><span class="v">${p.Tamanho_Camisa || '—'}</span></div>
+      <div class="detail-row"><span class="k">Peso / Altura</span><span class="v">${p.Peso || '—'}kg / ${p.Altura || '—'}cm</span></div>
+      <div class="detail-row"><span class="k">Condicionamento físico</span><span class="v">${p.Condicionamento_Fisico || '—'}/5</span></div>
+    </div>
+    ${link ? `<p><a class="wa-link" href="${link}" target="_blank">💬 Conversar no WhatsApp</a></p>` : ''}
+
+    <h3 style="margin-top:24px;">Anamnese</h3>
+    <div class="detail-grid">
+      ${flags.map(f => `<div class="detail-row"><span class="k">${f.label}</span><span class="v"><span class="flag-dot ${f.ok?'ok':'alert'}"></span>${f.value}</span></div>`).join('')}
+      <div class="detail-row"><span class="k">Atividade física</span><span class="v">${p.Atividade_Fisica || '—'}</span></div>
+      <div class="detail-row"><span class="k">Documentos enviados</span><span class="v">${badge(p.Documentos_Enviados === 'Sim','Sim','Não')}</span></div>
+    </div>
+
+    <h3 style="margin-top:24px;">Gestão da equipe médica</h3>
+    <div class="field">
+      <label>Status da avaliação</label>
+      <select id="f_status">
+        ${['Sem avaliação','Atenção','Aprovado','Reprovado','Desistência'].map(s =>
+          `<option value="${s}" ${p.gestao.Status_Avaliacao === s ? 'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Responsável pela avaliação</label>
+      <input type="text" id="f_resp" value="${p.gestao.Responsavel || ''}">
+    </div>
+    <div class="field">
+      <label>Comentário</label>
+      <textarea id="f_comentario" rows="3">${p.gestao.Comentario || ''}</textarea>
+    </div>
+    <div class="field checkbox-row">
+      <input type="checkbox" id="f_exame" ${p.gestao.Exame_Conferido === 'Sim' ? 'checked' : ''}>
+      <label style="margin:0;">Exame conferido</label>
+    </div>
+    <div class="field checkbox-row">
+      <input type="checkbox" id="f_atestado" ${p.gestao.Atestado_Conferido === 'Sim' ? 'checked' : ''}>
+      <label style="margin:0;">Atestado conferido</label>
+    </div>
+    <button class="primary" onclick="salvarFicha('${p.CPF}')">Salvar alterações</button>
+  `;
+}
+function salvarFicha(cpf){
+  saveGestao(cpf, {
+    Status_Avaliacao: document.getElementById('f_status').value,
+    Responsavel: document.getElementById('f_resp').value,
+    Comentario: document.getElementById('f_comentario').value,
+    Exame_Conferido: document.getElementById('f_exame').checked ? 'Sim' : 'Não',
+    Atestado_Conferido: document.getElementById('f_atestado').checked ? 'Sim' : 'Não'
+  }).then(() => renderFichaDetail(cpf));
+}
+document.getElementById('fichaSearch').addEventListener('input', (e) => renderFichaList(e.target.value));
+
+/* ======================= IMPORTAR DADOS ======================= */
+const COL = {
+  cpf: 'CPF', nome: 'Nome', email: 'Email',
+  tel1: 'Telefone',
+  tel2: 'confirmeseunumerodewhatsappParticipante',
+  tel3: 'confirmenovamenteseunumerodewhatsappParticipante',
+  idade: 'Idade', cidade: 'Cidade que reside', estado: 'Estado que reside',
+  camisa: 'Tamanho camisa', peso: 'Peso', altura: 'Altura',
+  condFisico: 'Condicionamento físico',
+  condMedicaOld: 'Condição médica',
+  condMedicaNew: 'vocetemalgumproblemadesaudedescrevaaseguirParticipante',
+  medOld: 'Faz uso de medicamento',
+  medNew: 'fazusodealgummedicamentodescrevaquaisParticipante',
+  restricao: 'Tem restrição alimentar',
+  atividade: 'praticaatividadefisicadescrevaqualatividadefisicaefrequenciaParticipante',
+  fumaBebe: 'fumabebeouusadrogasdescrevaqualsubstanciaeafrequenciadeusoParticipante',
+  statusAval: 'statusAvaliacaoParticipante'
+};
+
+function mapRawRow(row){
+  const cpf = normalizeCPF(row[COL.cpf]);
+  if(!cpf || cpf === '00000000000') return null;
+  const tel = resolvePhone(row[COL.tel1], row[COL.tel2], row[COL.tel3]);
+  const documentosEnviados = (row[COL.statusAval] && String(row[COL.statusAval]).trim() !== '') ? 'Sim' : 'Não';
+  return {
+    CPF: cpf,
+    Nome: row[COL.nome] || '',
+    Email: row[COL.email] || '',
+    Telefone_Verificado: tel.numero,
+    Telefone_Status: tel.status,
+    Idade: row[COL.idade] || '',
+    Cidade: row[COL.cidade] || '',
+    Estado: row[COL.estado] || '',
+    Tamanho_Camisa: row[COL.camisa] || '',
+    Peso: row[COL.peso] || '',
+    Altura: row[COL.altura] || '',
+    Condicionamento_Fisico: row[COL.condFisico] || '',
+    Condicao_Medica: pickAnswer(row[COL.condMedicaOld], row[COL.condMedicaNew]),
+    Medicamento: pickAnswer(row[COL.medOld], row[COL.medNew]),
+    Restricao_Alimentar: row[COL.restricao] || 'Não',
+    Atividade_Fisica: row[COL.atividade] || '',
+    Fuma_Bebe_Drogas: row[COL.fumaBebe] || 'Não',
+    Documentos_Enviados: documentosEnviados
+  };
+}
+
+function handleFile(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const records = rows.map(mapRawRow).filter(Boolean);
+      if(records.length === 0){
+        showToast('Nenhum registro válido encontrado no arquivo.', true);
+        return;
+      }
+      showUploadPreview(records);
+    }catch(err){
+      showToast('Erro ao ler o arquivo: ' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showUploadPreview(records){
+  state.pendingUpload = records;
+  const existingCpfs = new Set(ativos().map(p => p.CPF));
+  const incomingCpfs = new Set(records.map(r => r.CPF));
+  const novos = records.filter(r => !existingCpfs.has(r.CPF)).length;
+  const atualizados = records.filter(r => existingCpfs.has(r.CPF)).length;
+  const removidos = [...existingCpfs].filter(cpf => !incomingCpfs.has(cpf)).length;
+
+  document.getElementById('uploadPreview').innerHTML = `
+    <div class="diff-summary">
+      <div class="diff-pill novos">${novos} novo(s)</div>
+      <div class="diff-pill atualizados">${atualizados} atualizado(s)</div>
+      <div class="diff-pill removidos">${removidos} saíram da lista</div>
+    </div>
+    <p style="color:var(--text-muted);font-size:13px;">
+      Quem saiu da lista não é apagado — fica marcado como "fora da lista atual" e o histórico da equipe médica é preservado.
+    </p>
+    <button class="primary" onclick="confirmUpload()">Confirmar importação</button>
+    <button class="ghost" onclick="cancelUpload()">Cancelar</button>
+  `;
+}
+function cancelUpload(){
+  state.pendingUpload = null;
+  document.getElementById('uploadPreview').innerHTML = '';
+}
+async function confirmUpload(){
+  if(!state.pendingUpload) return;
+  try{
+    const res = await apiPost({ action: 'sync', records: state.pendingUpload });
+    if(!res.ok) throw new Error(res.error || 'Erro ao sincronizar');
+    showToast(`Importado: ${res.novos} novo(s), ${res.atualizados} atualizado(s), ${res.removidos} saíram da lista.`);
+    document.getElementById('uploadPreview').innerHTML = '';
+    state.pendingUpload = null;
+    await loadData();
+  }catch(err){
+    showToast('Erro ao importar: ' + err.message, true);
+  }
+}
+
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+uploadZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+['dragover','dragleave','drop'].forEach(evt => {
+  uploadZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    uploadZone.classList.toggle('dragover', evt === 'dragover');
+  });
+});
+uploadZone.addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files[0];
+  if(file) handleFile(file);
+});
+
+/* ======================= RENDER ALL ======================= */
+function renderAll(){
+  renderVisaoGeral();
+  renderPendencias();
+  renderAlertas();
+  renderContato();
+  renderFichaList(document.getElementById('fichaSearch').value);
+  if(state.selectedCpf) renderFichaDetail(state.selectedCpf);
+}
+
+/* ======================= INIT ======================= */
+loadData();
+</script>
+</body>
+</html>
