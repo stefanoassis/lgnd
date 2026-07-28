@@ -73,8 +73,11 @@
   .toolbar input[type=search]{max-width:280px;}
   .toolbar select{max-width:200px;}
 
-  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;}
-  table{border-collapse:collapse;font-size:13px;width:100%;min-width:1400px;}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .top-scrollbar{overflow-x:auto;overflow-y:hidden;height:14px;border-bottom:1px solid var(--border);}
+  .top-scrollbar-inner{height:1px;}
+  .table-scroll{overflow:auto;max-height:68vh;}
+  table{border-collapse:collapse;font-size:13px;width:100%;min-width:1900px;}
   thead th{
     text-align:left;font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);text-transform:uppercase;
     letter-spacing:0.04em;padding:10px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
@@ -116,9 +119,15 @@
   select.status-select.Desistência{background:var(--surface-2);color:var(--text-muted);}
   select.status-select.Sem-avaliação{background:rgba(110,147,168,0.14);color:var(--info);}
 
-  input.comentario-input{width:170px;}
-  input.resp-input{width:130px;}
+  textarea.comentario-textarea{width:150px;resize:vertical;font-size:12px;line-height:1.35;}
+  select.resp-select{width:140px;}
   .chk{width:16px;height:16px;cursor:pointer;}
+
+  .imc-badge{font-weight:600;}
+  .score-badge{font-family:var(--font-display);font-size:14px;padding:3px 10px;border-radius:6px;}
+  .score-badge.s100, .score-badge.s75{background:var(--ok-bg);color:var(--ok);}
+  .score-badge.s50{background:var(--warn-bg);color:var(--warn);}
+  .score-badge.s25, .score-badge.s0{background:var(--alert-bg);color:var(--alert);}
 
   button.primary{
     background:var(--accent);color:#1B1207;border:none;padding:10px 18px;border-radius:8px;
@@ -217,25 +226,33 @@
       </select>
     </div>
     <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>Nome</th>
-          <th>Idade</th>
-          <th>Condição médica</th>
-          <th>Medicamento</th>
-          <th>Restrição alim.</th>
-          <th>Fuma/bebe/drogas</th>
-          <th>Docs.</th>
-          <th>Telefone</th>
-          <th>Status contato</th>
-          <th>Comentário</th>
-          <th>Exame</th>
-          <th>Atestado</th>
-          <th>Responsável</th>
-          <th>Avaliação</th>
-        </tr></thead>
-        <tbody id="tableBody"></tbody>
-      </table>
+      <div class="top-scrollbar" id="topScrollbar"><div class="top-scrollbar-inner" id="topScrollbarInner"></div></div>
+      <div class="table-scroll" id="tableScroll">
+        <table>
+          <thead><tr>
+            <th>Nome</th>
+            <th>Idade</th>
+            <th>Altura</th>
+            <th>Peso</th>
+            <th>IMC</th>
+            <th>IMC Descrição</th>
+            <th>Condição médica</th>
+            <th>Medicamento</th>
+            <th>Restrição alim.</th>
+            <th>Fuma/bebe/drogas</th>
+            <th>Score Saúde</th>
+            <th>Docs.</th>
+            <th>Telefone</th>
+            <th>Contato</th>
+            <th>Comentário</th>
+            <th>Exame</th>
+            <th>Atestado</th>
+            <th>Responsável</th>
+            <th>Avaliação</th>
+          </tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
     </div>
     <div id="tableEmpty" class="empty-state" style="display:none;">
       <div class="big">Nenhum participante encontrado</div>
@@ -274,6 +291,7 @@ const CONFIG = {
 /* ======================= ESTADO ======================= */
 const state = {
   participantes: [],
+  responsaveis: [],
   pendingUpload: null,
   filtroTexto: '',
   filtroStatus: ''
@@ -324,6 +342,39 @@ function computeFlags(p){
     { key: 'Fuma_Bebe_Drogas', value: p.Fuma_Bebe_Drogas, ok: isRespostaNegativa(p.Fuma_Bebe_Drogas) }
   ];
 }
+function computeIMC(pesoRaw, alturaRaw){
+  const peso = parseFloat(String(pesoRaw || '').replace(',', '.'));
+  let altura = parseFloat(String(alturaRaw || '').replace(',', '.'));
+  if(!peso || !altura) return null;
+  if(altura > 3) altura = altura / 100; // veio em cm
+  if(!altura) return null;
+  const imc = peso / (altura * altura);
+  return Math.round(imc * 10) / 10;
+}
+function imcDescricao(imc){
+  if(imc === null || isNaN(imc)) return '—';
+  if(imc < 18.5) return 'Magreza';
+  if(imc < 25) return 'Normal';
+  if(imc < 30) return 'Sobrepeso';
+  if(imc < 40) return 'Obesidade';
+  return 'Obesidade Grave';
+}
+function computeScoreSaude(flags){
+  const okCount = flags.filter(f => f.ok).length;
+  return okCount * 25;
+}
+function escAttr(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+function escHtml(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+const CONTATO_OPTS = [
+  { v: 'Aguardando contato', l: 'Aguardando' },
+  { v: 'Tentando / Em contato', l: 'Em contato' },
+  { v: 'Contato realizado', l: 'Feito' },
+  { v: 'Sem necessidade de contato', l: 'N/A' }
+];
 function waLink(numero){
   if(!numero) return null;
   const withCountry = numero.length === 10 || numero.length === 11 ? '55' + numero : numero;
@@ -371,6 +422,7 @@ async function loadData(){
     const data = await apiGet();
     if(!data.ok) throw new Error(data.error || 'Erro desconhecido');
     state.participantes = data.participantes.map(p => Object.assign({}, p, { gestao: p.gestao || {} }));
+    state.responsaveis = data.responsaveis || [];
     setConn('ok');
     document.getElementById('lastSync').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
     renderAll();
@@ -438,6 +490,15 @@ function flagCellHtml(flag, colName){
   return `<td class="flag-cell ${flag.ok ? '' : 'is-alert'}">${dot}<span class="txt">${txt}</span></td>`;
 }
 
+function responsavelOptionsHtml(current){
+  const list = state.responsaveis.slice();
+  if(current && !list.includes(current)) list.unshift(current);
+  const opts = ['<option value="">—</option>'].concat(
+    list.map(r => `<option value="${escAttr(r)}" ${r === current ? 'selected' : ''}>${escHtml(r)}</option>`)
+  );
+  return opts.join('');
+}
+
 function renderTable(){
   const term = state.filtroTexto.toLowerCase();
   const statusFiltro = state.filtroStatus;
@@ -451,36 +512,48 @@ function renderTable(){
 
   document.getElementById('tableBody').innerHTML = list.map(p => {
     const flags = computeFlags(p);
+    const imc = computeIMC(p.Peso, p.Altura);
+    const score = computeScoreSaude(flags);
     const link = waLink(p.Telefone_Verificado);
     const telHtml = p.Telefone_Status === 'Verificado'
       ? `<span class="mono">${p.Telefone_Verificado}</span> ${link ? `<a class="wa-link" href="${link}" target="_blank" title="Abrir WhatsApp">💬</a>` : ''}`
       : `<span class="badge warn">⚠️ ${p.Telefone_Status || 'sem número'}</span>`;
     const statusVal = p.gestao.Status_Avaliacao || 'Sem avaliação';
     const statusClass = statusVal.replace(/\s+/g, '-');
+    const comentario = p.gestao.Comentario || '';
 
     return `<tr>
-      <td class="name-cell"><div class="name">${p.Nome}</div><div class="cpf">${formatCPF(p.CPF)} · ${p.Idade || '—'} anos</div></td>
+      <td class="name-cell"><div class="name">${p.Nome}</div><div class="cpf">${formatCPF(p.CPF)}</div></td>
       <td>${p.Idade || '—'}</td>
+      <td>${p.Altura || '—'}</td>
+      <td>${p.Peso || '—'}</td>
+      <td class="imc-badge">${imc !== null ? imc : '—'}</td>
+      <td>${imcDescricao(imc)}</td>
       ${flagCellHtml(flags[0])}
       ${flagCellHtml(flags[1])}
       ${flagCellHtml(flags[2])}
       ${flagCellHtml(flags[3])}
+      <td><span class="score-badge s${score}">${score}</span></td>
       <td>${p.Documentos_Enviados === 'Sim' ? '<span class="badge ok">Sim</span>' : '<span class="badge warn">Não</span>'}</td>
       <td>${telHtml}</td>
       <td>
         <select onchange="saveGestao('${p.CPF}', {Status_Contato: this.value})">
-          ${['Aguardando contato','Tentando / Em contato','Contato realizado','Sem necessidade de contato'].map(s =>
-            `<option value="${s}" ${p.gestao.Status_Contato === s ? 'selected' : ''}>${s}</option>`).join('')}
+          ${CONTATO_OPTS.map(o =>
+            `<option value="${o.v}" ${p.gestao.Status_Contato === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}
         </select>
       </td>
-      <td><input class="comentario-input" type="text" value="${(p.gestao.Comentario || '').replace(/"/g,'&quot;')}"
-          onchange="saveGestao('${p.CPF}', {Comentario: this.value})"></td>
+      <td><textarea class="comentario-textarea" rows="2" title="${escAttr(comentario)}"
+          oninput="this.title=this.value"
+          onchange="saveGestao('${p.CPF}', {Comentario: this.value})">${escHtml(comentario)}</textarea></td>
       <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Exame_Conferido === 'Sim' ? 'checked' : ''}
           onchange="saveGestao('${p.CPF}', {Exame_Conferido: this.checked ? 'Sim' : 'Não'})"></td>
       <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Atestado_Conferido === 'Sim' ? 'checked' : ''}
           onchange="saveGestao('${p.CPF}', {Atestado_Conferido: this.checked ? 'Sim' : 'Não'})"></td>
-      <td><input class="resp-input" type="text" value="${(p.gestao.Responsavel || '').replace(/"/g,'&quot;')}"
-          onchange="saveGestao('${p.CPF}', {Responsavel: this.value})"></td>
+      <td>
+        <select class="resp-select" onchange="saveGestao('${p.CPF}', {Responsavel: this.value})">
+          ${responsavelOptionsHtml(p.gestao.Responsavel)}
+        </select>
+      </td>
       <td>
         <select class="status-select ${statusClass}" onchange="this.className='status-select ' + this.value.replace(/\\s+/g,'-'); saveGestao('${p.CPF}', {Status_Avaliacao: this.value})">
           ${['Sem avaliação','Atenção','Aprovado','Reprovado','Desistência'].map(s =>
@@ -489,7 +562,22 @@ function renderTable(){
       </td>
     </tr>`;
   }).join('');
+
+  syncTopScrollbar();
 }
+
+function syncTopScrollbar(){
+  const top = document.getElementById('topScrollbar');
+  const scrollArea = document.getElementById('tableScroll');
+  const table = scrollArea.querySelector('table');
+  document.getElementById('topScrollbarInner').style.width = table.scrollWidth + 'px';
+}
+document.getElementById('topScrollbar').addEventListener('scroll', function(){
+  document.getElementById('tableScroll').scrollLeft = this.scrollLeft;
+});
+document.getElementById('tableScroll').addEventListener('scroll', function(){
+  document.getElementById('topScrollbar').scrollLeft = this.scrollLeft;
+});
 
 document.getElementById('tableSearch').addEventListener('input', (e) => { state.filtroTexto = e.target.value; renderTable(); });
 document.getElementById('statusFilter').addEventListener('change', (e) => { state.filtroStatus = e.target.value; renderTable(); });
