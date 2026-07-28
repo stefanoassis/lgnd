@@ -515,9 +515,10 @@ function responsavelOptionsHtml(current){
 
 function renderTable(){
   const term = state.filtroTexto.toLowerCase();
+  const termDigits = state.filtroTexto.replace(/\D/g,'');
   const statusFiltro = state.filtroStatus;
   const list = ativos().filter(p => {
-    const matchTerm = !term || p.Nome.toLowerCase().includes(term) || p.CPF.includes(term.replace(/\D/g,''));
+    const matchTerm = !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits));
     const matchStatus = !statusFiltro || (p.gestao.Status_Avaliacao || 'Sem avaliação') === statusFiltro;
     return matchTerm && matchStatus;
   });
