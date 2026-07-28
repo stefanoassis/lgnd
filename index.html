@@ -77,7 +77,7 @@
   .top-scrollbar{overflow-x:auto;overflow-y:hidden;height:14px;border-bottom:1px solid var(--border);}
   .top-scrollbar-inner{height:1px;}
   .table-scroll{overflow:auto;max-height:68vh;}
-  table{border-collapse:collapse;font-size:13px;width:100%;min-width:1900px;}
+  table{border-collapse:collapse;font-size:13px;width:100%;table-layout:auto;}
   thead th{
     text-align:left;font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);text-transform:uppercase;
     letter-spacing:0.04em;padding:10px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
@@ -89,6 +89,9 @@
   .mono{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);}
   .name-cell .name{font-weight:600;}
   .name-cell .cpf{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);}
+  .stacked-cell{white-space:normal;font-size:11.5px;line-height:1.5;}
+  .wa-phone{font-family:var(--font-mono);font-size:11px;color:#25D366;text-decoration:none;}
+  .wa-phone:hover{text-decoration:underline;}
 
   .badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap;}
   .badge.ok{background:var(--ok-bg);color:var(--ok);}
@@ -104,8 +107,6 @@
   .flag-cell span.txt{color:var(--text-muted);}
   .flag-cell.is-alert span.txt{color:var(--text);}
 
-  .wa-link{display:inline-flex;align-items:center;gap:4px;color:#25D366;text-decoration:none;font-weight:600;font-size:15px;}
-
   input[type=text], input[type=search], select, textarea{
     background:var(--surface-2);border:1px solid var(--border);color:var(--text);
     padding:7px 10px;border-radius:7px;font-family:var(--font-body);font-size:12.5px;
@@ -119,7 +120,7 @@
   select.status-select.Desistência{background:var(--surface-2);color:var(--text-muted);}
   select.status-select.Sem-avaliação{background:rgba(110,147,168,0.14);color:var(--info);}
 
-  textarea.comentario-textarea{width:150px;resize:vertical;font-size:12px;line-height:1.35;}
+  textarea.comentario-textarea{width:150px;resize:none;overflow:hidden;font-size:12px;line-height:1.35;}
   select.resp-select{width:140px;}
   .chk{width:16px;height:16px;cursor:pointer;}
 
@@ -231,18 +232,14 @@
         <table>
           <thead><tr>
             <th>Nome</th>
-            <th>Idade</th>
-            <th>Altura</th>
-            <th>Peso</th>
+            <th>Idade / Altura / Peso</th>
             <th>IMC</th>
-            <th>IMC Descrição</th>
             <th>Condição médica</th>
             <th>Medicamento</th>
             <th>Restrição alim.</th>
             <th>Fuma/bebe/drogas</th>
             <th>Score Saúde</th>
             <th>Docs.</th>
-            <th>Telefone</th>
             <th>Contato</th>
             <th>Comentário</th>
             <th>Exame</th>
@@ -515,27 +512,34 @@ function renderTable(){
     const imc = computeIMC(p.Peso, p.Altura);
     const score = computeScoreSaude(flags);
     const link = waLink(p.Telefone_Verificado);
-    const telHtml = p.Telefone_Status === 'Verificado'
-      ? `<span class="mono">${p.Telefone_Verificado}</span> ${link ? `<a class="wa-link" href="${link}" target="_blank" title="Abrir WhatsApp">💬</a>` : ''}`
-      : `<span class="badge warn">⚠️ ${p.Telefone_Status || 'sem número'}</span>`;
+    const telHtml = (p.Telefone_Status === 'Verificado' && link)
+      ? `<a class="wa-phone" href="${link}" target="_blank" title="Abrir WhatsApp">${p.Telefone_Verificado}</a>`
+      : `<span class="badge warn" style="font-size:10px;">⚠️ ${p.Telefone_Status || 'sem número'}</span>`;
     const statusVal = p.gestao.Status_Avaliacao || 'Sem avaliação';
     const statusClass = statusVal.replace(/\s+/g, '-');
     const comentario = p.gestao.Comentario || '';
 
     return `<tr>
-      <td class="name-cell"><div class="name">${p.Nome}</div><div class="cpf">${formatCPF(p.CPF)}</div></td>
-      <td>${p.Idade || '—'}</td>
-      <td>${p.Altura || '—'}</td>
-      <td>${p.Peso || '—'}</td>
-      <td class="imc-badge">${imc !== null ? imc : '—'}</td>
-      <td>${imcDescricao(imc)}</td>
+      <td class="name-cell">
+        <div class="name">${p.Nome}</div>
+        <div class="cpf">${formatCPF(p.CPF)}</div>
+        <div>${telHtml}</div>
+      </td>
+      <td class="stacked-cell">
+        <div>${p.Idade || '—'} anos</div>
+        <div>${p.Altura || '—'} cm</div>
+        <div>${p.Peso || '—'} kg</div>
+      </td>
+      <td class="stacked-cell">
+        <div class="imc-badge">${imc !== null ? imc : '—'}</div>
+        <div>${imcDescricao(imc)}</div>
+      </td>
       ${flagCellHtml(flags[0])}
       ${flagCellHtml(flags[1])}
       ${flagCellHtml(flags[2])}
       ${flagCellHtml(flags[3])}
       <td><span class="score-badge s${score}">${score}</span></td>
       <td>${p.Documentos_Enviados === 'Sim' ? '<span class="badge ok">Sim</span>' : '<span class="badge warn">Não</span>'}</td>
-      <td>${telHtml}</td>
       <td>
         <select onchange="saveGestao('${p.CPF}', {Status_Contato: this.value})">
           ${CONTATO_OPTS.map(o =>
