@@ -121,10 +121,18 @@
   select.status-select.Sem-avaliação{background:rgba(110,147,168,0.14);color:var(--info);}
 
   textarea.comentario-textarea{width:150px;resize:none;overflow:hidden;font-size:12px;line-height:1.35;}
-  select.resp-select{width:140px;}
   .chk{width:16px;height:16px;cursor:pointer;}
 
   .imc-badge{font-weight:600;}
+  .imc-desc-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
+  .imc-desc-badge.imc-otimo{background:var(--ok-bg);color:var(--ok);}
+  .imc-desc-badge.imc-atencao{background:var(--warn-bg);color:var(--warn);}
+  .imc-desc-badge.imc-ruim{background:var(--alert-bg);color:var(--alert);}
+  .imc-desc-badge.imc-grave{background:var(--alert);color:#fff;}
+
+  .gestao-cell select{display:block;width:150px;margin-bottom:4px;font-size:11.5px;}
+  .gestao-cell select:last-child{margin-bottom:0;}
+
   .score-badge{font-family:var(--font-display);font-size:14px;padding:3px 10px;border-radius:6px;}
   .score-badge.s100, .score-badge.s75{background:var(--ok-bg);color:var(--ok);}
   .score-badge.s50{background:var(--warn-bg);color:var(--warn);}
@@ -232,7 +240,7 @@
         <table>
           <thead><tr>
             <th>Nome</th>
-            <th>Idade / Altura / Peso</th>
+            <th>Medidas</th>
             <th>IMC</th>
             <th>Condição médica</th>
             <th>Medicamento</th>
@@ -240,12 +248,10 @@
             <th>Fuma/bebe/drogas</th>
             <th>Score Saúde</th>
             <th>Docs.</th>
-            <th>Contato</th>
             <th>Comentário</th>
             <th>Exame</th>
             <th>Atestado</th>
-            <th>Responsável</th>
-            <th>Avaliação</th>
+            <th>Gestão</th>
           </tr></thead>
           <tbody id="tableBody"></tbody>
         </table>
@@ -355,6 +361,16 @@ function imcDescricao(imc){
   if(imc < 30) return 'Sobrepeso';
   if(imc < 40) return 'Obesidade';
   return 'Obesidade Grave';
+}
+function imcDescClasse(desc){
+  switch(desc){
+    case 'Normal': return 'imc-otimo';
+    case 'Magreza':
+    case 'Sobrepeso': return 'imc-atencao';
+    case 'Obesidade': return 'imc-ruim';
+    case 'Obesidade Grave': return 'imc-grave';
+    default: return '';
+  }
 }
 function computeScoreSaude(flags){
   const okCount = flags.filter(f => f.ok).length;
@@ -532,7 +548,7 @@ function renderTable(){
       </td>
       <td class="stacked-cell">
         <div class="imc-badge">${imc !== null ? imc : '—'}</div>
-        <div>${imcDescricao(imc)}</div>
+        <div><span class="imc-desc-badge ${imcDescClasse(imcDescricao(imc))}">${imcDescricao(imc)}</span></div>
       </td>
       ${flagCellHtml(flags[0])}
       ${flagCellHtml(flags[1])}
@@ -540,12 +556,6 @@ function renderTable(){
       ${flagCellHtml(flags[3])}
       <td><span class="score-badge s${score}">${score}</span></td>
       <td>${p.Documentos_Enviados === 'Sim' ? '<span class="badge ok">Sim</span>' : '<span class="badge warn">Não</span>'}</td>
-      <td>
-        <select onchange="saveGestao('${p.CPF}', {Status_Contato: this.value})">
-          ${CONTATO_OPTS.map(o =>
-            `<option value="${o.v}" ${p.gestao.Status_Contato === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}
-        </select>
-      </td>
       <td><textarea class="comentario-textarea" rows="2" title="${escAttr(comentario)}"
           oninput="this.title=this.value"
           onchange="saveGestao('${p.CPF}', {Comentario: this.value})">${escHtml(comentario)}</textarea></td>
@@ -553,12 +563,14 @@ function renderTable(){
           onchange="saveGestao('${p.CPF}', {Exame_Conferido: this.checked ? 'Sim' : 'Não'})"></td>
       <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Atestado_Conferido === 'Sim' ? 'checked' : ''}
           onchange="saveGestao('${p.CPF}', {Atestado_Conferido: this.checked ? 'Sim' : 'Não'})"></td>
-      <td>
-        <select class="resp-select" onchange="saveGestao('${p.CPF}', {Responsavel: this.value})">
+      <td class="gestao-cell">
+        <select onchange="saveGestao('${p.CPF}', {Responsavel: this.value})">
           ${responsavelOptionsHtml(p.gestao.Responsavel)}
         </select>
-      </td>
-      <td>
+        <select onchange="saveGestao('${p.CPF}', {Status_Contato: this.value})">
+          ${CONTATO_OPTS.map(o =>
+            `<option value="${o.v}" ${p.gestao.Status_Contato === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}
+        </select>
         <select class="status-select ${statusClass}" onchange="this.className='status-select ' + this.value.replace(/\\s+/g,'-'); saveGestao('${p.CPF}', {Status_Avaliacao: this.value})">
           ${['Sem avaliação','Atenção','Aprovado','Reprovado','Desistência'].map(s =>
             `<option value="${s}" ${statusVal === s ? 'selected' : ''}>${s}</option>`).join('')}
