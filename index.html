@@ -85,7 +85,7 @@
   }
   tbody td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
   tbody tr:hover{background:var(--surface-2);}
-  tbody td.name-cell{white-space:normal;min-width:170px;}
+  tbody td.name-cell{white-space:normal;min-width:120px;max-width:130px;}
   .mono{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);}
   .name-cell .name{font-weight:600;}
   .name-cell .cpf{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);}
@@ -120,7 +120,8 @@
   select.status-select.Desistência{background:var(--surface-2);color:var(--text-muted);}
   select.status-select.Sem-avaliação{background:rgba(110,147,168,0.14);color:var(--info);}
 
-  textarea.comentario-textarea{width:150px;resize:none;overflow:hidden;font-size:12px;line-height:1.35;}
+  td.comentario-cell{min-width:260px;}
+  textarea.comentario-textarea{width:100%;min-width:250px;resize:none;overflow:hidden;font-size:12px;line-height:1.35;}
   .chk{width:16px;height:16px;cursor:pointer;}
 
   .imc-badge{font-weight:600;}
@@ -248,9 +249,9 @@
             <th>Fuma/bebe/drogas</th>
             <th>Score Saúde</th>
             <th>Docs.</th>
-            <th>Comentário</th>
             <th>Exame</th>
             <th>Atestado</th>
+            <th>Comentário</th>
             <th>Gestão</th>
           </tr></thead>
           <tbody id="tableBody"></tbody>
@@ -556,13 +557,13 @@ function renderTable(){
       ${flagCellHtml(flags[3])}
       <td><span class="score-badge s${score}">${score}</span></td>
       <td>${p.Documentos_Enviados === 'Sim' ? '<span class="badge ok">Sim</span>' : '<span class="badge warn">Não</span>'}</td>
-      <td><textarea class="comentario-textarea" rows="2" title="${escAttr(comentario)}"
-          oninput="this.title=this.value"
-          onchange="saveGestao('${p.CPF}', {Comentario: this.value})">${escHtml(comentario)}</textarea></td>
       <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Exame_Conferido === 'Sim' ? 'checked' : ''}
           onchange="saveGestao('${p.CPF}', {Exame_Conferido: this.checked ? 'Sim' : 'Não'})"></td>
       <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Atestado_Conferido === 'Sim' ? 'checked' : ''}
           onchange="saveGestao('${p.CPF}', {Atestado_Conferido: this.checked ? 'Sim' : 'Não'})"></td>
+      <td class="comentario-cell"><textarea class="comentario-textarea" rows="5" title="${escAttr(comentario)}"
+          oninput="this.title=this.value"
+          onchange="saveGestao('${p.CPF}', {Comentario: this.value})">${escHtml(comentario)}</textarea></td>
       <td class="gestao-cell">
         <select onchange="saveGestao('${p.CPF}', {Responsavel: this.value})">
           ${responsavelOptionsHtml(p.gestao.Responsavel)}
