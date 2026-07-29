@@ -384,10 +384,10 @@ function escHtml(s){
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 const CONTATO_OPTS = [
-  { v: 'Aguardando contato', l: 'Aguardando' },
-  { v: 'Tentando / Em contato', l: 'Em contato' },
-  { v: 'Contato realizado', l: 'Feito' },
-  { v: 'Sem necessidade de contato', l: 'N/A' }
+  { v: 'Tentando contato', l: 'Tentando contato' },
+  { v: 'Aguardando retorno', l: 'Aguardando retorno' },
+  { v: 'Em contato', l: 'Em contato' },
+  { v: 'Contato feito', l: 'Contato feito' }
 ];
 function waLink(numero){
   if(!numero) return null;
