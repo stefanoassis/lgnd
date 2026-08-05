@@ -645,6 +645,11 @@ function mapRawRow(row, cpf){
   };
 }
 
+function isLegendario(valorIngresso){
+  const v = String(valorIngresso || '').trim().toLowerCase();
+  return v.startsWith('legendário') || v.startsWith('legendario');
+}
+
 function handleFile(file){
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -663,7 +668,7 @@ function handleFile(file){
           ignoradosSemCpf++;
           return;
         }
-        if(String(row[COL.ingresso] || '').trim() !== 'Participante'){
+        if(isLegendario(row[COL.ingresso])){
           ignoradosIngresso++;
           return;
         }
@@ -695,7 +700,7 @@ function showUploadPreview(records, ignoradosIngresso, ignoradosSemCpf){
       <div class="diff-pill novos">${novos} novo(s)</div>
       <div class="diff-pill atualizados">${atualizados} atualizado(s)</div>
       <div class="diff-pill removidos">${removidos} saíram da lista</div>
-      ${ignoradosIngresso > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosIngresso} ignorado(s) (não é Participante)</div>` : ''}
+      ${ignoradosIngresso > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosIngresso} ignorado(s) (Ingresso = Legendário)</div>` : ''}
       ${ignoradosSemCpf > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosSemCpf} ignorado(s) (sem CPF válido)</div>` : ''}
     </div>
     <p style="color:var(--text-muted);font-size:13px;">
