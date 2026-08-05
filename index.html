@@ -616,10 +616,12 @@ const COL = {
   restricao: 'Tem restrição alimentar',
   atividade: 'praticaatividadefisicadescrevaqualatividadefisicaefrequenciaParticipante',
   fumaBebe: 'fumabebeouusadrogasdescrevaqualsubstanciaeafrequenciadeusoParticipante',
-  statusAval: 'statusAvaliacaoParticipante'
+  statusAval: 'statusAvaliacaoParticipante',
+  ingresso: 'Ingresso'
 };
 
 function mapRawRow(row){
+  if(String(row[COL.ingresso] || '').trim() !== 'Participante') return null;
   const cpf = normalizeCPF(row[COL.cpf]);
   if(!cpf || cpf === '00000000000') return null;
   const tel = resolvePhone(row[COL.tel1], row[COL.tel2], row[COL.tel3]);
@@ -654,11 +656,12 @@ function handleFile(file){
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
       const records = rows.map(mapRawRow).filter(Boolean);
+      const ignorados = rows.length - records.length;
       if(records.length === 0){
         showToast('Nenhum registro válido encontrado no arquivo.', true);
         return;
       }
-      showUploadPreview(records);
+      showUploadPreview(records, ignorados);
     }catch(err){
       showToast('Erro ao ler o arquivo: ' + err.message, true);
     }
@@ -666,7 +669,7 @@ function handleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
-function showUploadPreview(records){
+function showUploadPreview(records, ignorados){
   state.pendingUpload = records;
   const existingCpfs = new Set(ativos().map(p => p.CPF));
   const incomingCpfs = new Set(records.map(r => r.CPF));
@@ -679,6 +682,7 @@ function showUploadPreview(records){
       <div class="diff-pill novos">${novos} novo(s)</div>
       <div class="diff-pill atualizados">${atualizados} atualizado(s)</div>
       <div class="diff-pill removidos">${removidos} saíram da lista</div>
+      ${ignorados > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignorados} ignorado(s) (não é Participante)</div>` : ''}
     </div>
     <p style="color:var(--text-muted);font-size:13px;">
       Quem sair da lista deixa de aparecer no dashboard. Decisões já registradas para quem continuar ativo (status, comentário, exame/atestado) são mantidas.
