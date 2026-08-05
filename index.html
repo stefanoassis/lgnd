@@ -658,18 +658,19 @@ function handleFile(file){
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-      let ignoradosSemCpf = 0;
-      let ignoradosIngresso = 0;
+      const ignoradosSemCpf = [];
+      const ignoradosIngresso = [];
       const records = [];
 
       rows.forEach(row => {
+        const nomeRaw = row[COL.nome] || '(sem nome)';
         const cpf = normalizeCPF(row[COL.cpf]);
         if(!cpf || cpf === '00000000000'){
-          ignoradosSemCpf++;
+          ignoradosSemCpf.push({ nome: nomeRaw, valor: row[COL.cpf] });
           return;
         }
         if(isLegendario(row[COL.ingresso])){
-          ignoradosIngresso++;
+          ignoradosIngresso.push({ nome: nomeRaw, valor: row[COL.ingresso] });
           return;
         }
         records.push(mapRawRow(row, cpf));
@@ -695,14 +696,25 @@ function showUploadPreview(records, ignoradosIngresso, ignoradosSemCpf){
   const atualizados = records.filter(r => existingCpfs.has(r.CPF)).length;
   const removidos = [...existingCpfs].filter(cpf => !incomingCpfs.has(cpf)).length;
 
+  const temIgnorados = ignoradosIngresso.length > 0 || ignoradosSemCpf.length > 0;
+  const detalhesHtml = temIgnorados ? `
+    <details style="margin:14px 0;">
+      <summary style="cursor:pointer;color:var(--text-muted);font-size:12.5px;">Ver quem foi ignorado e por quê</summary>
+      <div style="margin-top:10px;font-size:12.5px;color:var(--text-muted);display:flex;flex-direction:column;gap:4px;">
+        ${ignoradosIngresso.map(r => `<div>⛔ <strong style="color:var(--text);">${escHtml(r.nome)}</strong> — Ingresso: "${escHtml(r.valor)}"</div>`).join('')}
+        ${ignoradosSemCpf.map(r => `<div>⚠️ <strong style="color:var(--text);">${escHtml(r.nome)}</strong> — CPF na planilha: "${escHtml(r.valor)}"</div>`).join('')}
+      </div>
+    </details>` : '';
+
   document.getElementById('uploadPreview').innerHTML = `
     <div class="diff-summary">
       <div class="diff-pill novos">${novos} novo(s)</div>
       <div class="diff-pill atualizados">${atualizados} atualizado(s)</div>
       <div class="diff-pill removidos">${removidos} saíram da lista</div>
-      ${ignoradosIngresso > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosIngresso} ignorado(s) (Ingresso = Legendário)</div>` : ''}
-      ${ignoradosSemCpf > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosSemCpf} ignorado(s) (sem CPF válido)</div>` : ''}
+      ${ignoradosIngresso.length > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosIngresso.length} ignorado(s) (Ingresso = Legendário)</div>` : ''}
+      ${ignoradosSemCpf.length > 0 ? `<div class="diff-pill" style="background:var(--surface-2);color:var(--text-muted);">${ignoradosSemCpf.length} ignorado(s) (sem CPF válido)</div>` : ''}
     </div>
+    ${detalhesHtml}
     <p style="color:var(--text-muted);font-size:13px;">
       Quem sair da lista deixa de aparecer no dashboard. Decisões já registradas para quem continuar ativo (status, comentário, exame/atestado) são mantidas.
     </p>
