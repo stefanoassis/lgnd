@@ -617,7 +617,8 @@ const COL = {
   atividade: 'praticaatividadefisicadescrevaqualatividadefisicaefrequenciaParticipante',
   fumaBebe: 'fumabebeouusadrogasdescrevaqualsubstanciaeafrequenciadeusoParticipante',
   statusAval: 'statusAvaliacaoParticipante',
-  ingresso: 'Ingresso'
+  ingresso: 'Ingresso',
+  docEstrangeiro: 'Doc. Estrangeiro'
 };
 
 function mapRawRow(row, cpf){
@@ -664,9 +665,18 @@ function handleFile(file){
 
       rows.forEach(row => {
         const nomeRaw = row[COL.nome] || '(sem nome)';
-        const cpf = normalizeCPF(row[COL.cpf]);
+        let cpfBruto = row[COL.cpf];
+        let cpf = normalizeCPF(cpfBruto);
         if(!cpf || cpf === '00000000000'){
-          ignoradosSemCpf.push({ nome: nomeRaw, valor: row[COL.cpf] });
+          // CPF vazio/inválido: tenta usar "Doc. Estrangeiro" como identificador alternativo
+          const cpfAlt = normalizeCPF(row[COL.docEstrangeiro]);
+          if(cpfAlt && cpfAlt !== '00000000000'){
+            cpf = cpfAlt;
+            cpfBruto = row[COL.docEstrangeiro];
+          }
+        }
+        if(!cpf || cpf === '00000000000'){
+          ignoradosSemCpf.push({ nome: nomeRaw, valor: cpfBruto });
           return;
         }
         if(isLegendario(row[COL.ingresso])){
