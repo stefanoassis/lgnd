@@ -620,9 +620,7 @@ const COL = {
   ingresso: 'Ingresso'
 };
 
-function mapRawRow(row){
-  const cpf = normalizeCPF(row[COL.cpf]);
-  if(!cpf || cpf === '00000000000') return null;
+function mapRawRow(row, cpf){
   const tel = resolvePhone(row[COL.tel1], row[COL.tel2], row[COL.tel3]);
   const documentosEnviados = (row[COL.statusAval] && String(row[COL.statusAval]).trim() !== '') ? 'Sim' : 'Não';
   return {
@@ -655,11 +653,22 @@ function handleFile(file){
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-      const rowsParticipante = rows.filter(r => String(r[COL.ingresso] || '').trim() === 'Participante');
-      const ignoradosIngresso = rows.length - rowsParticipante.length;
+      let ignoradosSemCpf = 0;
+      let ignoradosIngresso = 0;
+      const records = [];
 
-      const records = rowsParticipante.map(mapRawRow).filter(Boolean);
-      const ignoradosSemCpf = rowsParticipante.length - records.length;
+      rows.forEach(row => {
+        const cpf = normalizeCPF(row[COL.cpf]);
+        if(!cpf || cpf === '00000000000'){
+          ignoradosSemCpf++;
+          return;
+        }
+        if(String(row[COL.ingresso] || '').trim() !== 'Participante'){
+          ignoradosIngresso++;
+          return;
+        }
+        records.push(mapRawRow(row, cpf));
+      });
 
       if(records.length === 0){
         showToast('Nenhum registro válido encontrado no arquivo.', true);
