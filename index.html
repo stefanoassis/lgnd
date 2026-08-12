@@ -269,6 +269,7 @@
   <section id="tab-termo" class="tab">
     <div class="toolbar">
       <input type="search" id="termoSearch" placeholder="Buscar por nome ou CPF…">
+      <button class="ghost" id="btnDistribuirTermo">Distribuir responsáveis automaticamente</button>
     </div>
     <div class="table-wrap">
       <div class="top-scrollbar" id="topScrollbarTermo"><div class="top-scrollbar-inner" id="topScrollbarInnerTermo"></div></div>
@@ -631,6 +632,22 @@ setupScrollSync('topScrollbarTermo', 'tableScrollTermo');
 document.getElementById('tableSearch').addEventListener('input', (e) => { state.filtroTexto = e.target.value; renderTable(); });
 document.getElementById('statusFilter').addEventListener('change', (e) => { state.filtroStatus = e.target.value; renderTable(); });
 document.getElementById('termoSearch').addEventListener('input', (e) => { state.filtroTextoTermo = e.target.value; renderTermoTable(); });
+
+document.getElementById('btnDistribuirTermo').addEventListener('click', async () => {
+  const ok = confirm('Isso vai atribuir automaticamente um responsável (de forma equilibrada) para todos os participantes ativos que ainda estão sem um. Quem já tem responsável não será alterado. Continuar?');
+  if(!ok) return;
+  showLoading('Distribuindo responsáveis…');
+  try{
+    const res = await apiPost({ action: 'rebalancearTermo' });
+    if(!res.ok) throw new Error(res.error || 'Erro ao distribuir');
+    showToast(`Distribuído: ${res.atribuidos} participante(s) receberam responsável.`);
+    await loadData();
+  }catch(err){
+    showToast('Erro ao distribuir: ' + err.message, true);
+  }finally{
+    hideLoading();
+  }
+});
 
 /* ======================= RENDER: TABELA GESTÃO TERMO ======================= */
 function renderTermoTable(){
