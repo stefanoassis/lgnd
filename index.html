@@ -434,11 +434,22 @@ const CONTATO_OPTS = [
   { v: 'Em contato', l: 'Em contato' },
   { v: 'Contato feito', l: 'Contato feito' }
 ];
-function waLink(numero){
+function waLink(numero, texto){
   if(!numero) return null;
   const withCountry = numero.length === 10 || numero.length === 11 ? '55' + numero : numero;
-  return 'https://api.whatsapp.com/send/?phone=' + withCountry;
+  let url = 'https://api.whatsapp.com/send/?phone=' + withCountry;
+  if(texto) url += '&text=' + encodeURIComponent(texto);
+  return url;
 }
+function mensagemTermoWhatsapp(p){
+  const responsavel = p.gestao.Responsavel_Termo || 'nossa equipe de triagem';
+  return `Olá ${p.Nome}, tudo bem?
+Me chamo ${responsavel} e falo em nome da equipe de triagem do TOP 1773 - Legendários La Comunidad.
+Vi aqui no sistema que você ainda não assinou o termo de responsabilidade que você recebeu por e-mail após a inscrição.
+A assinatura desse termo é obrigatória para participação no evento. Por isso, segue o link para assinatura digital a seguir.
+Qualquer dúvida, estarei à disposição.`;
+}
+
 function showToast(msg, isError){
   const el = document.createElement('div');
   el.className = 'toast' + (isError ? ' error' : '');
@@ -714,7 +725,7 @@ function renderTermoTable(){
 
   document.getElementById('termoTableBody').innerHTML = list.map(p => {
     const comentario = p.gestao.Comentario_Termo || '';
-    const link = waLink(p.Telefone_Verificado);
+    const link = waLink(p.Telefone_Verificado, mensagemTermoWhatsapp(p));
     const telHtml = (p.Telefone_Status === 'Verificado' && link)
       ? `<a class="wa-phone" href="${link}" target="_blank" title="Abrir WhatsApp">${p.Telefone_Verificado}</a>`
       : `<span class="badge warn" style="font-size:10px;">⚠️ ${p.Telefone_Status || 'sem número'}</span>`;
