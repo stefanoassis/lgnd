@@ -267,8 +267,14 @@
 
   <!-- GESTÃO TERMO — visão simplificada pra equipe do termo de responsabilidade -->
   <section id="tab-termo" class="tab">
+    <div class="kpi-row" id="kpiRowTermo"></div>
     <div class="toolbar">
       <input type="search" id="termoSearch" placeholder="Buscar por nome ou CPF…">
+      <select id="termoStatusFilter">
+        <option value="">Todos os status</option>
+        <option value="Assinado">Assinado</option>
+        <option value="Pendente">Pendente</option>
+      </select>
       <button class="ghost" id="btnDistribuirTermo">Distribuir responsáveis automaticamente</button>
     </div>
     <div class="table-wrap">
@@ -326,7 +332,8 @@ const state = {
   pendingUpload: null,
   filtroTexto: '',
   filtroStatus: '',
-  filtroTextoTermo: ''
+  filtroTextoTermo: '',
+  filtroStatusTermo: ''
 };
 
 /* ======================= UTILITÁRIOS ======================= */
@@ -633,6 +640,7 @@ setupScrollSync('topScrollbarTermo', 'tableScrollTermo');
 document.getElementById('tableSearch').addEventListener('input', (e) => { state.filtroTexto = e.target.value; renderTable(); });
 document.getElementById('statusFilter').addEventListener('change', (e) => { state.filtroStatus = e.target.value; renderTable(); });
 document.getElementById('termoSearch').addEventListener('input', (e) => { state.filtroTextoTermo = e.target.value; renderTermoTable(); });
+document.getElementById('termoStatusFilter').addEventListener('change', (e) => { state.filtroStatusTermo = e.target.value; renderTermoTable(); });
 
 document.getElementById('btnDistribuirTermo').addEventListener('click', async () => {
   const ok = confirm('Isso vai atribuir automaticamente um responsável (de forma equilibrada) para todos os participantes ativos que ainda estão sem um. Quem já tem responsável não será alterado. Continuar?');
@@ -651,12 +659,29 @@ document.getElementById('btnDistribuirTermo').addEventListener('click', async ()
 });
 
 /* ======================= RENDER: TABELA GESTÃO TERMO ======================= */
+function renderKpisTermo(){
+  const list = ativos();
+  const assinados = list.filter(p => p.gestao.Termo_Assinado === 'Sim').length;
+  const pills = [
+    { l: 'Total', n: list.length, cls: 'accent' },
+    { l: 'Assinados', n: assinados, cls: 'ok' },
+    { l: 'Pendentes', n: list.length - assinados, cls: 'warn' }
+  ];
+  document.getElementById('kpiRowTermo').innerHTML = pills.map(k =>
+    `<div class="kpi-pill ${k.cls}"><b>${k.n}</b> ${k.l}</div>`
+  ).join('');
+}
+
 function renderTermoTable(){
   const term = state.filtroTextoTermo.toLowerCase();
   const termDigits = state.filtroTextoTermo.replace(/\D/g,'');
-  const list = ativos().filter(p =>
-    !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits))
-  );
+  const statusFiltro = state.filtroStatusTermo;
+  const list = ativos().filter(p => {
+    const matchTerm = !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits));
+    const assinado = p.gestao.Termo_Assinado === 'Sim';
+    const matchStatus = !statusFiltro || (statusFiltro === 'Assinado' ? assinado : !assinado);
+    return matchTerm && matchStatus;
+  });
 
   document.getElementById('termoTableEmpty').style.display = list.length ? 'none' : 'block';
 
@@ -860,6 +885,7 @@ uploadZone.addEventListener('drop', (e) => {
 function renderAll(){
   renderKpis();
   renderTable();
+  renderKpisTermo();
   renderTermoTable();
 }
 
