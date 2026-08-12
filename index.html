@@ -215,7 +215,8 @@
 </header>
 
 <nav id="tabNav">
-  <button data-tab="gestao" class="active">Gestão</button>
+  <button data-tab="gestao" class="active">Gestão Hakunas</button>
+  <button data-tab="termo">Gestão Termo</button>
   <button data-tab="importar">Importar Dados</button>
 </nav>
 
@@ -264,6 +265,30 @@
     </div>
   </section>
 
+  <!-- GESTÃO TERMO — visão simplificada pra equipe do termo de responsabilidade -->
+  <section id="tab-termo" class="tab">
+    <div class="toolbar">
+      <input type="search" id="termoSearch" placeholder="Buscar por nome ou CPF…">
+    </div>
+    <div class="table-wrap">
+      <div class="top-scrollbar" id="topScrollbarTermo"><div class="top-scrollbar-inner" id="topScrollbarInnerTermo"></div></div>
+      <div class="table-scroll" id="tableScrollTermo">
+        <table>
+          <thead><tr>
+            <th>Nome</th>
+            <th>Termo</th>
+            <th>Comentário</th>
+            <th>Gestão</th>
+          </tr></thead>
+          <tbody id="termoTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="termoTableEmpty" class="empty-state" style="display:none;">
+      <div class="big">Nenhum participante encontrado</div>
+    </div>
+  </section>
+
   <!-- IMPORTAR DADOS -->
   <section id="tab-importar" class="tab">
     <div class="card">
@@ -296,9 +321,11 @@ const CONFIG = {
 const state = {
   participantes: [],
   responsaveis: [],
+  responsaveisTermo: [],
   pendingUpload: null,
   filtroTexto: '',
-  filtroStatus: ''
+  filtroStatus: '',
+  filtroTextoTermo: ''
 };
 
 /* ======================= UTILITÁRIOS ======================= */
@@ -437,6 +464,7 @@ async function loadData(){
     if(!data.ok) throw new Error(data.error || 'Erro desconhecido');
     state.participantes = data.participantes.map(p => Object.assign({}, p, { gestao: p.gestao || {} }));
     state.responsaveis = data.responsaveis || [];
+    state.responsaveisTermo = data.responsaveisTermo || [];
     setConn('ok');
     document.getElementById('lastSync').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
     renderAll();
@@ -504,8 +532,8 @@ function flagCellHtml(flag, colName){
   return `<td class="flag-cell ${flag.ok ? '' : 'is-alert'}">${dot}<span class="txt">${txt}</span></td>`;
 }
 
-function responsavelOptionsHtml(current){
-  const list = state.responsaveis.slice();
+function responsavelOptionsHtml(current, lista){
+  const list = (lista || state.responsaveis).slice();
   if(current && !list.includes(current)) list.unshift(current);
   const opts = ['<option value="">—</option>'].concat(
     list.map(r => `<option value="${escAttr(r)}" ${r === current ? 'selected' : ''}>${escHtml(r)}</option>`)
@@ -584,21 +612,62 @@ function renderTable(){
   syncTopScrollbar();
 }
 
-function syncTopScrollbar(){
-  const top = document.getElementById('topScrollbar');
-  const scrollArea = document.getElementById('tableScroll');
+function syncTopScrollbar(topId, scrollId){
+  topId = topId || 'topScrollbar';
+  scrollId = scrollId || 'tableScroll';
+  const scrollArea = document.getElementById(scrollId);
   const table = scrollArea.querySelector('table');
-  document.getElementById('topScrollbarInner').style.width = table.scrollWidth + 'px';
+  document.getElementById(topId + 'Inner').style.width = table.scrollWidth + 'px';
 }
-document.getElementById('topScrollbar').addEventListener('scroll', function(){
-  document.getElementById('tableScroll').scrollLeft = this.scrollLeft;
-});
-document.getElementById('tableScroll').addEventListener('scroll', function(){
-  document.getElementById('topScrollbar').scrollLeft = this.scrollLeft;
-});
+function setupScrollSync(topId, scrollId){
+  const top = document.getElementById(topId);
+  const scrollArea = document.getElementById(scrollId);
+  top.addEventListener('scroll', function(){ scrollArea.scrollLeft = this.scrollLeft; });
+  scrollArea.addEventListener('scroll', function(){ top.scrollLeft = this.scrollLeft; });
+}
+setupScrollSync('topScrollbar', 'tableScroll');
+setupScrollSync('topScrollbarTermo', 'tableScrollTermo');
 
 document.getElementById('tableSearch').addEventListener('input', (e) => { state.filtroTexto = e.target.value; renderTable(); });
 document.getElementById('statusFilter').addEventListener('change', (e) => { state.filtroStatus = e.target.value; renderTable(); });
+document.getElementById('termoSearch').addEventListener('input', (e) => { state.filtroTextoTermo = e.target.value; renderTermoTable(); });
+
+/* ======================= RENDER: TABELA GESTÃO TERMO ======================= */
+function renderTermoTable(){
+  const term = state.filtroTextoTermo.toLowerCase();
+  const termDigits = state.filtroTextoTermo.replace(/\D/g,'');
+  const list = ativos().filter(p =>
+    !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits))
+  );
+
+  document.getElementById('termoTableEmpty').style.display = list.length ? 'none' : 'block';
+
+  document.getElementById('termoTableBody').innerHTML = list.map(p => {
+    const comentario = p.gestao.Comentario_Termo || '';
+    return `<tr>
+      <td class="name-cell">
+        <div class="name">${p.Nome}</div>
+        <div class="cpf">${formatCPF(p.CPF)}</div>
+      </td>
+      <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Termo_Assinado === 'Sim' ? 'checked' : ''}
+          onchange="saveGestao('${p.CPF}', {Termo_Assinado: this.checked ? 'Sim' : 'Não'})"></td>
+      <td class="comentario-cell"><textarea class="comentario-textarea" rows="5" title="${escAttr(comentario)}"
+          oninput="this.title=this.value"
+          onchange="saveGestao('${p.CPF}', {Comentario_Termo: this.value})">${escHtml(comentario)}</textarea></td>
+      <td class="gestao-cell">
+        <select onchange="saveGestao('${p.CPF}', {Responsavel_Termo: this.value})">
+          ${responsavelOptionsHtml(p.gestao.Responsavel_Termo, state.responsaveisTermo)}
+        </select>
+        <select onchange="saveGestao('${p.CPF}', {Status_Contato_Termo: this.value})">
+          ${CONTATO_OPTS.map(o =>
+            `<option value="${o.v}" ${p.gestao.Status_Contato_Termo === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
+
+  syncTopScrollbar('topScrollbarTermo', 'tableScrollTermo');
+}
 
 /* ======================= IMPORTAR DADOS ======================= */
 const COL = {
@@ -773,6 +842,7 @@ uploadZone.addEventListener('drop', (e) => {
 function renderAll(){
   renderKpis();
   renderTable();
+  renderTermoTable();
 }
 
 /* ======================= INIT ======================= */
