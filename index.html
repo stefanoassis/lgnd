@@ -714,10 +714,15 @@ function renderTermoTable(){
 
   document.getElementById('termoTableBody').innerHTML = list.map(p => {
     const comentario = p.gestao.Comentario_Termo || '';
+    const link = waLink(p.Telefone_Verificado);
+    const telHtml = (p.Telefone_Status === 'Verificado' && link)
+      ? `<a class="wa-phone" href="${link}" target="_blank" title="Abrir WhatsApp">${p.Telefone_Verificado}</a>`
+      : `<span class="badge warn" style="font-size:10px;">⚠️ ${p.Telefone_Status || 'sem número'}</span>`;
     return `<tr>
       <td class="name-cell">
         <div class="name">${p.Nome}</div>
         <div class="cpf">${formatCPF(p.CPF)}</div>
+        <div>${telHtml}</div>
       </td>
       <td style="text-align:center;"><input class="chk" type="checkbox" ${p.gestao.Termo_Assinado === 'Sim' ? 'checked' : ''}
           onchange="saveGestao('${p.CPF}', {Termo_Assinado: this.checked ? 'Sim' : 'Não'})"></td>
