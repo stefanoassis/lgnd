@@ -235,6 +235,10 @@
         <option value="Reprovado">Reprovado</option>
         <option value="Desistência">Desistência</option>
       </select>
+      <select id="responsavelFilter">
+        <option value="">Todos os responsáveis</option>
+      </select>
+      <button class="ghost" id="btnDistribuirHakunas">Distribuir responsáveis automaticamente</button>
     </div>
     <div class="table-wrap">
       <div class="top-scrollbar" id="topScrollbar"><div class="top-scrollbar-inner" id="topScrollbarInner"></div></div>
@@ -274,6 +278,9 @@
         <option value="">Todos os status</option>
         <option value="Assinado">Assinado</option>
         <option value="Pendente">Pendente</option>
+      </select>
+      <select id="termoResponsavelFilter">
+        <option value="">Todos os responsáveis</option>
       </select>
       <button class="ghost" id="btnDistribuirTermo">Distribuir responsáveis automaticamente</button>
     </div>
@@ -333,7 +340,9 @@ const state = {
   filtroTexto: '',
   filtroStatus: '',
   filtroTextoTermo: '',
-  filtroStatusTermo: ''
+  filtroStatusTermo: '',
+  filtroResponsavel: '',
+  filtroResponsavelTermo: ''
 };
 
 /* ======================= UTILITÁRIOS ======================= */
@@ -474,6 +483,8 @@ async function loadData(){
     state.participantes = data.participantes.map(p => Object.assign({}, p, { gestao: p.gestao || {} }));
     state.responsaveis = data.responsaveis || [];
     state.responsaveisTermo = data.responsaveisTermo || [];
+    popularFiltroResponsavel('responsavelFilter', state.responsaveis);
+    popularFiltroResponsavel('termoResponsavelFilter', state.responsaveisTermo);
     setConn('ok');
     document.getElementById('lastSync').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
     renderAll();
@@ -489,6 +500,14 @@ function setConn(state_){
   const label = document.getElementById('connLabel');
   dot.className = 'dot' + (state_ === 'ok' ? ' ok' : state_ === 'bad' ? ' bad' : '');
   label.textContent = state_ === 'ok' ? 'conectado' : state_ === 'bad' ? 'sem conexão' : 'conectando…';
+}
+
+function popularFiltroResponsavel(selectId, lista){
+  const select = document.getElementById(selectId);
+  const atual = select.value;
+  select.innerHTML = '<option value="">Todos os responsáveis</option>' +
+    lista.map(r => `<option value="${escAttr(r)}">${escHtml(r)}</option>`).join('');
+  if(lista.includes(atual)) select.value = atual;
 }
 
 async function saveGestao(cpf, updates){
@@ -554,10 +573,12 @@ function renderTable(){
   const term = state.filtroTexto.toLowerCase();
   const termDigits = state.filtroTexto.replace(/\D/g,'');
   const statusFiltro = state.filtroStatus;
+  const respFiltro = state.filtroResponsavel;
   const list = ativos().filter(p => {
     const matchTerm = !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits));
     const matchStatus = !statusFiltro || (p.gestao.Status_Avaliacao || 'Sem avaliação') === statusFiltro;
-    return matchTerm && matchStatus;
+    const matchResp = !respFiltro || p.gestao.Responsavel === respFiltro;
+    return matchTerm && matchStatus && matchResp;
   });
 
   document.getElementById('tableEmpty').style.display = list.length ? 'none' : 'block';
@@ -639,15 +660,17 @@ setupScrollSync('topScrollbarTermo', 'tableScrollTermo');
 
 document.getElementById('tableSearch').addEventListener('input', (e) => { state.filtroTexto = e.target.value; renderTable(); });
 document.getElementById('statusFilter').addEventListener('change', (e) => { state.filtroStatus = e.target.value; renderTable(); });
+document.getElementById('responsavelFilter').addEventListener('change', (e) => { state.filtroResponsavel = e.target.value; renderTable(); });
 document.getElementById('termoSearch').addEventListener('input', (e) => { state.filtroTextoTermo = e.target.value; renderTermoTable(); });
 document.getElementById('termoStatusFilter').addEventListener('change', (e) => { state.filtroStatusTermo = e.target.value; renderTermoTable(); });
+document.getElementById('termoResponsavelFilter').addEventListener('change', (e) => { state.filtroResponsavelTermo = e.target.value; renderTermoTable(); });
 
-document.getElementById('btnDistribuirTermo').addEventListener('click', async () => {
+async function distribuirResponsaveis(equipe){
   const ok = confirm('Isso vai atribuir automaticamente um responsável (de forma equilibrada) para todos os participantes ativos que ainda estão sem um. Quem já tem responsável não será alterado. Continuar?');
   if(!ok) return;
   showLoading('Distribuindo responsáveis…');
   try{
-    const res = await apiPost({ action: 'rebalancearTermo' });
+    const res = await apiPost({ action: 'rebalancear', equipe });
     if(!res.ok) throw new Error(res.error || 'Erro ao distribuir');
     showToast(`Distribuído: ${res.atribuidos} participante(s) receberam responsável.`);
     await loadData();
@@ -656,7 +679,9 @@ document.getElementById('btnDistribuirTermo').addEventListener('click', async ()
   }finally{
     hideLoading();
   }
-});
+}
+document.getElementById('btnDistribuirTermo').addEventListener('click', () => distribuirResponsaveis('termo'));
+document.getElementById('btnDistribuirHakunas').addEventListener('click', () => distribuirResponsaveis('hakunas'));
 
 /* ======================= RENDER: TABELA GESTÃO TERMO ======================= */
 function renderKpisTermo(){
@@ -676,11 +701,13 @@ function renderTermoTable(){
   const term = state.filtroTextoTermo.toLowerCase();
   const termDigits = state.filtroTextoTermo.replace(/\D/g,'');
   const statusFiltro = state.filtroStatusTermo;
+  const respFiltro = state.filtroResponsavelTermo;
   const list = ativos().filter(p => {
     const matchTerm = !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits));
     const assinado = p.gestao.Termo_Assinado === 'Sim';
     const matchStatus = !statusFiltro || (statusFiltro === 'Assinado' ? assinado : !assinado);
-    return matchTerm && matchStatus;
+    const matchResp = !respFiltro || p.gestao.Responsavel_Termo === respFiltro;
+    return matchTerm && matchStatus && matchResp;
   });
 
   document.getElementById('termoTableEmpty').style.display = list.length ? 'none' : 'block';
