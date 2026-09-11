@@ -225,6 +225,8 @@
   <!-- GESTÃO — tudo em uma única tabela -->
   <section id="tab-gestao" class="tab active">
     <div class="kpi-row" id="kpiRow"></div>
+    <h3 style="font-family:var(--font-display);font-size:14px;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted);margin:4px 0 10px;">Progresso por responsável</h3>
+    <div class="kpi-row" id="kpiRowResponsaveis" style="margin-top:-6px;"></div>
     <div class="toolbar">
       <input type="search" id="tableSearch" placeholder="Buscar por nome ou CPF…">
       <select id="statusFilter">
@@ -565,6 +567,20 @@ function renderKpis(){
   document.getElementById('kpiRow').innerHTML = pills.map(k =>
     `<div class="kpi-pill ${k.cls}"><b>${k.n}</b> ${k.l}</div>`
   ).join('');
+  renderKpisResponsaveis();
+}
+
+function renderKpisResponsaveis(){
+  const list = ativos();
+  const cards = state.responsaveis.map(nome => {
+    const doResponsavel = list.filter(p => p.gestao.Responsavel === nome);
+    const total = doResponsavel.length;
+    const concluidos = doResponsavel.filter(p => (p.gestao.Status_Avaliacao || 'Sem avaliação') !== 'Sem avaliação').length;
+    const pct = total > 0 ? Math.round((concluidos / total) * 100) : 0;
+    const cls = total === 0 ? '' : (pct >= 75 ? 'ok' : pct >= 40 ? 'warn' : 'alert');
+    return `<div class="kpi-pill ${cls}"><b>${concluidos}/${total}</b> ${nome} (${pct}%)</div>`;
+  });
+  document.getElementById('kpiRowResponsaveis').innerHTML = cards.join('');
 }
 
 function flagCellHtml(flag, colName){
