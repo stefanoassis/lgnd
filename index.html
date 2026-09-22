@@ -217,6 +217,7 @@
 <nav id="tabNav">
   <button data-tab="gestao" class="active">Gestão Hakunas</button>
   <button data-tab="termo">Gestão Termo</button>
+  <button data-tab="conhecidos">Conhecidos</button>
   <button data-tab="importar">Importar Dados</button>
 </nav>
 
@@ -307,6 +308,29 @@
     </div>
   </section>
 
+  <!-- CONHECIDOS — igreja e pessoas conhecidas, só leitura -->
+  <section id="tab-conhecidos" class="tab">
+    <div class="toolbar">
+      <input type="search" id="conhecidosSearch" placeholder="Buscar por nome ou CPF…">
+    </div>
+    <div class="table-wrap">
+      <div class="top-scrollbar" id="topScrollbarConhecidos"><div class="top-scrollbar-inner" id="topScrollbarInnerConhecidos"></div></div>
+      <div class="table-scroll" id="tableScrollConhecidos">
+        <table>
+          <thead><tr>
+            <th>Nome</th>
+            <th>Igreja</th>
+            <th>Conhecidos</th>
+          </tr></thead>
+          <tbody id="conhecidosTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="conhecidosTableEmpty" class="empty-state" style="display:none;">
+      <div class="big">Nenhum participante encontrado</div>
+    </div>
+  </section>
+
   <!-- IMPORTAR DADOS -->
   <section id="tab-importar" class="tab">
     <div class="card">
@@ -346,7 +370,8 @@ const state = {
   filtroTextoTermo: '',
   filtroStatusTermo: '',
   filtroResponsavel: '',
-  filtroResponsavelTermo: ''
+  filtroResponsavelTermo: '',
+  filtroTextoConhecidos: ''
 };
 
 /* ======================= UTILITÁRIOS ======================= */
@@ -431,6 +456,10 @@ function escAttr(s){
 }
 function escHtml(s){
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function splitNomes(raw){
+  if(!raw) return [];
+  return String(raw).split(/\r\n|\n|;|,/).map(s => s.trim()).filter(Boolean);
 }
 const CONTATO_OPTS = [
   { v: 'Tentando contato', l: 'Tentando contato' },
@@ -686,11 +715,13 @@ function setupScrollSync(topId, scrollId){
 }
 setupScrollSync('topScrollbar', 'tableScroll');
 setupScrollSync('topScrollbarTermo', 'tableScrollTermo');
+setupScrollSync('topScrollbarConhecidos', 'tableScrollConhecidos');
 
 document.getElementById('tableSearch').addEventListener('input', (e) => { state.filtroTexto = e.target.value; renderTable(); });
 document.getElementById('statusFilter').addEventListener('change', (e) => { state.filtroStatus = e.target.value; renderTable(); });
 document.getElementById('responsavelFilter').addEventListener('change', (e) => { state.filtroResponsavel = e.target.value; renderTable(); });
 document.getElementById('termoSearch').addEventListener('input', (e) => { state.filtroTextoTermo = e.target.value; renderTermoTable(); });
+document.getElementById('conhecidosSearch').addEventListener('input', (e) => { state.filtroTextoConhecidos = e.target.value; renderConhecidosTable(); });
 document.getElementById('termoStatusFilter').addEventListener('change', (e) => { state.filtroStatusTermo = e.target.value; renderTermoTable(); });
 document.getElementById('termoResponsavelFilter').addEventListener('change', (e) => { state.filtroResponsavelTermo = e.target.value; renderTermoTable(); });
 
@@ -787,6 +818,34 @@ function renderTermoTable(){
   syncTopScrollbar('topScrollbarTermo', 'tableScrollTermo');
 }
 
+/* ======================= RENDER: TABELA CONHECIDOS ======================= */
+function renderConhecidosTable(){
+  const term = state.filtroTextoConhecidos.toLowerCase();
+  const termDigits = state.filtroTextoConhecidos.replace(/\D/g,'');
+  const list = ativos().filter(p =>
+    !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits))
+  );
+
+  document.getElementById('conhecidosTableEmpty').style.display = list.length ? 'none' : 'block';
+
+  document.getElementById('conhecidosTableBody').innerHTML = list.map(p => {
+    const conhecidosLista = splitNomes(p.Conhecidos);
+    const conhecidosHtml = conhecidosLista.length
+      ? conhecidosLista.map(n => `<div>${escHtml(n)}</div>`).join('')
+      : '—';
+    return `<tr>
+      <td class="name-cell">
+        <div class="name">${p.Nome}</div>
+        <div class="cpf">${formatCPF(p.CPF)}</div>
+      </td>
+      <td class="stacked-cell">${escHtml(p.Igreja) || '—'}</td>
+      <td class="stacked-cell">${conhecidosHtml}</td>
+    </tr>`;
+  }).join('');
+
+  syncTopScrollbar('topScrollbarConhecidos', 'tableScrollConhecidos');
+}
+
 /* ======================= IMPORTAR DADOS ======================= */
 const COL = {
   cpf: 'CPF', nome: 'Nome', email: 'Email',
@@ -808,7 +867,7 @@ const COL = {
   docEstrangeiro: 'Doc. Estrangeiro'
 };
 
-function mapRawRow(row, cpf){
+function mapRawRow(row, cpf, igreja, conhecidos){
   const tel = resolvePhone(row[COL.tel1], row[COL.tel2], row[COL.tel3]);
   const documentosEnviados = (row[COL.statusAval] && String(row[COL.statusAval]).trim() !== '') ? 'Sim' : 'Não';
   return {
@@ -829,7 +888,9 @@ function mapRawRow(row, cpf){
     Restricao_Alimentar: row[COL.restricao] || 'Não',
     Atividade_Fisica: row[COL.atividade] || '',
     Fuma_Bebe_Drogas: row[COL.fumaBebe] || 'Não',
-    Documentos_Enviados: documentosEnviados
+    Documentos_Enviados: documentosEnviados,
+    Igreja: igreja || '',
+    Conhecidos: conhecidos || ''
   };
 }
 
@@ -845,12 +906,17 @@ function handleFile(file){
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      // Lidas por posição (coluna AT/BC), não por nome de cabeçalho —
+      // assim funciona mesmo que a plataforma não dê um nome claro a elas.
+      const rowsRaw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      const colIgrejaIdx = XLSX.utils.decode_col('AT');
+      const colConhecidosIdx = XLSX.utils.decode_col('BC');
 
       const ignoradosSemCpf = [];
       const ignoradosIngresso = [];
       const records = [];
 
-      rows.forEach(row => {
+      rows.forEach((row, idx) => {
         const nomeRaw = row[COL.nome] || '(sem nome)';
         let cpfBruto = row[COL.cpf];
         let cpf = normalizeCPF(cpfBruto);
@@ -870,7 +936,10 @@ function handleFile(file){
           ignoradosIngresso.push({ nome: nomeRaw, valor: row[COL.ingresso] });
           return;
         }
-        records.push(mapRawRow(row, cpf));
+        const linhaBruta = rowsRaw[idx + 1] || [];
+        const igreja = linhaBruta[colIgrejaIdx] || '';
+        const conhecidos = linhaBruta[colConhecidosIdx] || '';
+        records.push(mapRawRow(row, cpf, igreja, conhecidos));
       });
 
       if(records.length === 0){
@@ -962,6 +1031,7 @@ function renderAll(){
   renderTable();
   renderKpisTermo();
   renderTermoTable();
+  renderConhecidosTable();
 }
 
 /* ======================= INIT ======================= */
