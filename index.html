@@ -312,6 +312,7 @@
   <section id="tab-conhecidos" class="tab">
     <div class="toolbar">
       <input type="search" id="conhecidosSearch" placeholder="Buscar por nome ou CPF…">
+      <input type="search" id="igrejaSearch" placeholder="Buscar por igreja…">
     </div>
     <div class="table-wrap">
       <div class="top-scrollbar" id="topScrollbarConhecidos"><div class="top-scrollbar-inner" id="topScrollbarInnerConhecidos"></div></div>
@@ -371,7 +372,8 @@ const state = {
   filtroStatusTermo: '',
   filtroResponsavel: '',
   filtroResponsavelTermo: '',
-  filtroTextoConhecidos: ''
+  filtroTextoConhecidos: '',
+  filtroIgreja: ''
 };
 
 /* ======================= UTILITÁRIOS ======================= */
@@ -722,6 +724,7 @@ document.getElementById('statusFilter').addEventListener('change', (e) => { stat
 document.getElementById('responsavelFilter').addEventListener('change', (e) => { state.filtroResponsavel = e.target.value; renderTable(); });
 document.getElementById('termoSearch').addEventListener('input', (e) => { state.filtroTextoTermo = e.target.value; renderTermoTable(); });
 document.getElementById('conhecidosSearch').addEventListener('input', (e) => { state.filtroTextoConhecidos = e.target.value; renderConhecidosTable(); });
+document.getElementById('igrejaSearch').addEventListener('input', (e) => { state.filtroIgreja = e.target.value; renderConhecidosTable(); });
 document.getElementById('termoStatusFilter').addEventListener('change', (e) => { state.filtroStatusTermo = e.target.value; renderTermoTable(); });
 document.getElementById('termoResponsavelFilter').addEventListener('change', (e) => { state.filtroResponsavelTermo = e.target.value; renderTermoTable(); });
 
@@ -822,9 +825,12 @@ function renderTermoTable(){
 function renderConhecidosTable(){
   const term = state.filtroTextoConhecidos.toLowerCase();
   const termDigits = state.filtroTextoConhecidos.replace(/\D/g,'');
-  const list = ativos().filter(p =>
-    !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits))
-  );
+  const termIgreja = state.filtroIgreja.toLowerCase();
+  const list = ativos().filter(p => {
+    const matchTerm = !term || p.Nome.toLowerCase().includes(term) || (termDigits && p.CPF.includes(termDigits));
+    const matchIgreja = !termIgreja || String(p.Igreja || '').toLowerCase().includes(termIgreja);
+    return matchTerm && matchIgreja;
+  });
 
   document.getElementById('conhecidosTableEmpty').style.display = list.length ? 'none' : 'block';
 
